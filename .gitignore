@@ -16,3 +16,9 @@ target
 # Added by cargo
 
 /target
+
+# Circuit binaries (V6/V7/V8 proving/verifying key data) - large content-
+# addressed blobs fetched from go-zk-circuits' catalog, not vendored in
+# git. Populate locally for dev/test via siros-org's circuit-distribution
+# service (https://zk-circuits.fly.dev) rather than committing them here.
+/circuits/
