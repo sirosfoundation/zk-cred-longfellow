@@ -17,7 +17,10 @@ impl InputLayout {
         if attributes == 0 || attributes > 4 {
             return Err(anyhow!("unsupported number of attributes: {attributes}"));
         }
-        Ok(Self { version, attributes })
+        Ok(Self {
+            version,
+            attributes,
+        })
     }
 
     pub(super) fn signature_statement_length(&self) -> usize {
@@ -119,10 +122,7 @@ impl InputLayout {
         // V8 adds ppid_seed (32*8 bits) and 2 SHA-256 block witnesses after attribute witnesses
         let ppid_wires = match self.version {
             CircuitVersion::V6 | CircuitVersion::V7 => 0,
-            CircuitVersion::V8 => {
-                PPID_SEED_BYTES * 8
-                    + sha_256_witness_wires(2)
-            }
+            CircuitVersion::V8 => PPID_SEED_BYTES * 8 + sha_256_witness_wires(2),
         };
         self.hash_statement_length()
             + 256 // hash of credential
@@ -201,9 +201,7 @@ impl InputLayout {
             CircuitVersion::V8 => {
                 let (vc, rest) = input.split_at_mut(VERIFIER_CONTEXT_BYTES * 8);
                 (
-                    Some(
-                        <&mut [Field2_128; VERIFIER_CONTEXT_BYTES * 8]>::try_from(vc).unwrap(),
-                    ),
+                    Some(<&mut [Field2_128; VERIFIER_CONTEXT_BYTES * 8]>::try_from(vc).unwrap()),
                     rest,
                 )
             }
@@ -261,7 +259,9 @@ impl InputLayout {
                     assert!(chunk.is_empty());
                     *out = Some(AttributeWitnessV6 {
                         sha_256_input: sha_256_input.try_into().unwrap(),
-                        sha_256_witness: Sha256Witness { input: sha_256_witness },
+                        sha_256_witness: Sha256Witness {
+                            input: sha_256_witness,
+                        },
                         digest_offset: digest_offset.try_into().unwrap(),
                         cbor_data_offset: cbor_data_offset.try_into().unwrap(),
                         cbor_data_length: cbor_data_length.try_into().unwrap(),
@@ -299,7 +299,9 @@ impl InputLayout {
                     *out = Some(AttributeWitnessV7 {
                         inner: AttributeWitnessV6 {
                             sha_256_input: sha_256_input.try_into().unwrap(),
-                            sha_256_witness: Sha256Witness { input: sha_256_witness },
+                            sha_256_witness: Sha256Witness {
+                                input: sha_256_witness,
+                            },
                             digest_offset: digest_offset.try_into().unwrap(),
                             cbor_data_offset: cbor_data_offset.try_into().unwrap(),
                             cbor_data_length: cbor_data_length.try_into().unwrap(),
@@ -338,7 +340,9 @@ impl InputLayout {
                 input = rest;
                 Some(PpidWitness {
                     seed: seed.try_into().unwrap(),
-                    sha_witness: Sha256Witness { input: sha_witness_data },
+                    sha_witness: Sha256Witness {
+                        input: sha_witness_data,
+                    },
                 })
             }
         };
@@ -418,7 +422,11 @@ impl<'a> EcdsaWitness<'a> {
         let (sum_q_r, witnesses) = witnesses.split_at_mut(2);
         let (sum_g_q_r, witnesses) = witnesses.split_at_mut(2);
         Self {
-            r_x, r_y, r_x_inverse, neg_s_inverse, q_x_inverse,
+            r_x,
+            r_y,
+            r_x_inverse,
+            neg_s_inverse,
+            q_x_inverse,
             sum_g_q: sum_g_q.try_into().unwrap(),
             sum_g_r: sum_g_r.try_into().unwrap(),
             sum_q_r: sum_q_r.try_into().unwrap(),
@@ -529,10 +537,8 @@ pub(super) struct AttributeInputV7<'a> {
 }
 
 impl<'a> AttributeInputV7<'a> {
-    const LENGTH: usize = ATTRIBUTE_CBOR_IDENTIFIER_LENGTH_V7 * 8
-        + ATTRIBUTE_CBOR_VALUE_LENGTH_V7 * 8
-        + 8
-        + 8;
+    const LENGTH: usize =
+        ATTRIBUTE_CBOR_IDENTIFIER_LENGTH_V7 * 8 + ATTRIBUTE_CBOR_VALUE_LENGTH_V7 * 8 + 8 + 8;
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
@@ -566,8 +572,7 @@ pub(super) struct Sha256BlockWitness<'a> {
 }
 
 impl<'a> Sha256BlockWitness<'a> {
-    pub(super) const LENGTH: usize =
-        48 * 32 / 4 + 64 * 2 * 32 / 4 + 8 * 32 / 4;
+    pub(super) const LENGTH: usize = 48 * 32 / 4 + 64 * 2 * 32 / 4 + 8 * 32 / 4;
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
@@ -603,8 +608,10 @@ impl<'a> AttributeWitnessV6<'a> {
     const LENGTH: usize = 2 * 64 * 8
         + 2 * Sha256BlockWitness::LENGTH
         + CBOR_OFFSET_BITS
-        + CBOR_OFFSET_BITS + CBOR_OFFSET_BITS
-        + CBOR_OFFSET_BITS + CBOR_OFFSET_BITS;
+        + CBOR_OFFSET_BITS
+        + CBOR_OFFSET_BITS
+        + CBOR_OFFSET_BITS
+        + CBOR_OFFSET_BITS;
 }
 
 #[derive(Default)]
@@ -628,10 +635,8 @@ pub(super) struct AttributeWitnessV7<'a> {
 }
 
 impl<'a> AttributeWitnessV7<'a> {
-    const LENGTH: usize = AttributeWitnessV6::LENGTH
-        + 3 * CBOR_OFFSET_BITS
-        + 4 * CBOR_OFFSET_BITS
-        + 4 * 2;
+    const LENGTH: usize =
+        AttributeWitnessV6::LENGTH + 3 * CBOR_OFFSET_BITS + 4 * CBOR_OFFSET_BITS + 4 * 2;
 }
 
 // ── Wire count helpers ─────────────────────────────────────────────────────
@@ -682,27 +687,51 @@ mod tests {
     }
 
     #[wasm_bindgen_test(unsupported = test)]
-    fn correct_lengths_v6_1() { correct_lengths(CircuitVersion::V6, 1); }
+    fn correct_lengths_v6_1() {
+        correct_lengths(CircuitVersion::V6, 1);
+    }
     #[wasm_bindgen_test(unsupported = test)]
-    fn correct_lengths_v6_2() { correct_lengths(CircuitVersion::V6, 2); }
+    fn correct_lengths_v6_2() {
+        correct_lengths(CircuitVersion::V6, 2);
+    }
     #[wasm_bindgen_test(unsupported = test)]
-    fn correct_lengths_v6_3() { correct_lengths(CircuitVersion::V6, 3); }
+    fn correct_lengths_v6_3() {
+        correct_lengths(CircuitVersion::V6, 3);
+    }
     #[wasm_bindgen_test(unsupported = test)]
-    fn correct_lengths_v6_4() { correct_lengths(CircuitVersion::V6, 4); }
+    fn correct_lengths_v6_4() {
+        correct_lengths(CircuitVersion::V6, 4);
+    }
     #[wasm_bindgen_test(unsupported = test)]
-    fn correct_lengths_v7_1() { correct_lengths(CircuitVersion::V7, 1); }
+    fn correct_lengths_v7_1() {
+        correct_lengths(CircuitVersion::V7, 1);
+    }
     #[wasm_bindgen_test(unsupported = test)]
-    fn correct_lengths_v7_2() { correct_lengths(CircuitVersion::V7, 2); }
+    fn correct_lengths_v7_2() {
+        correct_lengths(CircuitVersion::V7, 2);
+    }
     #[wasm_bindgen_test(unsupported = test)]
-    fn correct_lengths_v7_3() { correct_lengths(CircuitVersion::V7, 3); }
+    fn correct_lengths_v7_3() {
+        correct_lengths(CircuitVersion::V7, 3);
+    }
     #[wasm_bindgen_test(unsupported = test)]
-    fn correct_lengths_v7_4() { correct_lengths(CircuitVersion::V7, 4); }
+    fn correct_lengths_v7_4() {
+        correct_lengths(CircuitVersion::V7, 4);
+    }
     #[wasm_bindgen_test(unsupported = test)]
-    fn correct_lengths_v8_1() { correct_lengths(CircuitVersion::V8, 1); }
+    fn correct_lengths_v8_1() {
+        correct_lengths(CircuitVersion::V8, 1);
+    }
     #[wasm_bindgen_test(unsupported = test)]
-    fn correct_lengths_v8_2() { correct_lengths(CircuitVersion::V8, 2); }
+    fn correct_lengths_v8_2() {
+        correct_lengths(CircuitVersion::V8, 2);
+    }
     #[wasm_bindgen_test(unsupported = test)]
-    fn correct_lengths_v8_3() { correct_lengths(CircuitVersion::V8, 3); }
+    fn correct_lengths_v8_3() {
+        correct_lengths(CircuitVersion::V8, 3);
+    }
     #[wasm_bindgen_test(unsupported = test)]
-    fn correct_lengths_v8_4() { correct_lengths(CircuitVersion::V8, 4); }
+    fn correct_lengths_v8_4() {
+        correct_lengths(CircuitVersion::V8, 4);
+    }
 }

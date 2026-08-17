@@ -35,7 +35,6 @@ pub mod prover;
 mod sha256;
 pub mod verifier;
 
-// Add to src/mdoc_zk/mod.rs
 #[cfg(test)]
 mod prover_v8_test;
 /// Versions of the mdoc_zk circuit interface.
@@ -57,23 +56,36 @@ pub struct CircuitInputs {
     mac_messages: [Field2_128; 6],
 }
 
-    /// Fill PPID private witness values for V8 circuits.
-    ///
-    /// Computes SHA-256(pseudonym_seed || verifier_context) and fills the
-    /// corresponding witness wires.
-    fn fill_ppid_witness<'a>(
-        ppid_witness: &'a mut layout::PpidWitness<'a>,
-        attribute_ids: &[&str],
-        attributes: &[mdoc::ParsedAttribute],
-        verifier_context: &[u8; 32],
-        hash_bit_plucker: &BitPlucker<4, Field2_128>,
-    ) -> Result<(), anyhow::Error> {
-        // Find the pairwise_pseudonym attribute to extract the seed
-        let seed: [u8; 32] = attribute_ids
+/// Fill PPID private witness values for V8 circuits.
+///
+/// Computes SHA-256(pseudonym_seed || verifier_context) and fills the
+/// corresponding witness wires.
+fn fill_ppid_witness<'a>(
+    ppid_witness: &'a mut layout::PpidWitness<'a>,
+    attribute_ids: &[&str],
+    attributes: &[mdoc::ParsedAttribute],
+    verifier_context: &[u8; 32],
+    hash_bit_plucker: &BitPlucker<4, Field2_128>,
+) -> Result<(), anyhow::Error> {
+    // Find the pairwise_pseudonym attribute to extract the seed. This
+    // function is only ever called when `split_hash_input.ppid_witness`
+    // is Some - i.e. only for a genuine V8/PPID proof - so a caller
+    // reaching this point without "pairwise_pseudonym" among
+    // `attribute_ids` is a real caller bug (an inconsistent request that
+    // asked for a PPID circuit without actually including the pseudonym
+    // attribute), not a legitimate "no pseudonym requested" case to
+    // silently tolerate. Erroring here (matching the sibling
+    // `verifier_context` check just above this call) prevents silently
+    // proving a pseudonym derived from an all-zero seed instead of
+    // failing loudly.
+    let seed: [u8; 32] = attribute_ids
             .iter()
             .zip(attributes.iter())
             .find(|(id, _)| **id == "pairwise_pseudonym")
-            .map(|(_, attr)| {
+            .ok_or_else(|| {
+                anyhow!("pairwise_pseudonym attribute required for V8 PPID witness, but not found in requested attributes")
+            })
+            .and_then(|(_, attr)| {
                 // The element value is CBOR-encoded: 0x58 0x20 followed by 32 bytes
                 let value = attr.element_value.value.as_slice();
                 if value.len() >= 34 && value[0] == 0x58 && value[1] == 0x20 {
@@ -85,28 +97,27 @@ pub struct CircuitInputs {
                         "pseudonym_seed value is not a valid 32-byte CBOR byte string"
                     ))
                 }
-            })
-            .unwrap_or(Ok([0u8; 32]))?; // default to zeros if attribute not present
+            })?;
 
-        // Fill ppid_seed bits (256 wires)
-        byte_array_as_bits(&seed, ppid_witness.seed);
+    // Fill ppid_seed bits (256 wires)
+    byte_array_as_bits(&seed, ppid_witness.seed);
 
-        // Compute SHA-256(seed || verifier_context) and fill witness
-        // Input is exactly 64 bytes = 1 SHA-256 block, but circuit uses 2 blocks
-        let mut sha_input = Vec::with_capacity(64);
-        sha_input.extend_from_slice(&seed);
-        sha_input.extend_from_slice(verifier_context);
+    // Compute SHA-256(seed || verifier_context) and fill witness
+    // Input is exactly 64 bytes = 1 SHA-256 block, but circuit uses 2 blocks
+    let mut sha_input = Vec::with_capacity(64);
+    sha_input.extend_from_slice(&seed);
+    sha_input.extend_from_slice(verifier_context);
 
-        run_sha256_witnessed(
-            &sha_input,
-            &mut ppid_witness.sha_witness,
-            hash_bit_plucker,
-            2,
-        )
-        .context("error computing PPID SHA-256 witness")?;
+    run_sha256_witnessed(
+        &sha_input,
+        &mut ppid_witness.sha_witness,
+        hash_bit_plucker,
+        2,
+    )
+    .context("error computing PPID SHA-256 witness")?;
 
-        Ok(())
-    }
+    Ok(())
+}
 impl CircuitInputs {
     /// Construct inputs for the signature and hash circuits.
     pub fn new(
@@ -284,8 +295,9 @@ impl CircuitInputs {
                         let raw_value = &pub_attr.value;
                         if raw_value.len() >= 34 && raw_value[0] == 0x58 && raw_value[1] == 0x20 {
                             let seed = &raw_value[2..34];
-                            let ctx = verifier_context
-                                .ok_or_else(|| anyhow!("verifier_context required for pairwise_pseudonym"))?;
+                            let ctx = verifier_context.ok_or_else(|| {
+                                anyhow!("verifier_context required for pairwise_pseudonym")
+                            })?;
                             let mut sha_input = Vec::with_capacity(64);
                             sha_input.extend_from_slice(seed);
                             sha_input.extend_from_slice(ctx);
@@ -326,8 +338,8 @@ impl CircuitInputs {
         byte_array_as_bits(time.as_bytes(), split_hash_input.statement.time);
 
         if let Some(vc) = split_hash_input.statement.verifier_context {
-            let ctx = verifier_context
-                .ok_or_else(|| anyhow!("verifier_context required for V8"))?;
+            let ctx =
+                verifier_context.ok_or_else(|| anyhow!("verifier_context required for V8"))?;
             byte_array_as_bits(ctx, vc);
         }
 
@@ -564,8 +576,8 @@ impl CircuitInputs {
         }
         // V8: fill PPID witness
         if let Some(ppid_witness) = &mut split_hash_input.ppid_witness {
-            let ctx = verifier_context
-                .ok_or_else(|| anyhow!("verifier_context required for V8 PPID"))?;
+            let ctx =
+                verifier_context.ok_or_else(|| anyhow!("verifier_context required for V8 PPID"))?;
             fill_ppid_witness(
                 ppid_witness,
                 attribute_ids,
@@ -860,8 +872,8 @@ impl CircuitStatements {
         byte_array_as_bits(time.as_bytes(), split_hash_statement.time);
         // V8: set verifier_context in public statement.
         if let Some(vc) = split_hash_statement.verifier_context {
-            let ctx = verifier_context
-                .ok_or_else(|| anyhow!("verifier_context required for V8"))?;
+            let ctx =
+                verifier_context.ok_or_else(|| anyhow!("verifier_context required for V8"))?;
             byte_array_as_bits(ctx, vc);
         }
 

@@ -11,8 +11,8 @@ use crate::{
     transcript::{Transcript, TranscriptMode},
 };
 use anyhow::{Context, anyhow};
-use wasm_bindgen::prelude::wasm_bindgen;
 use std::borrow::Cow;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 /// Zero-knowledge verifier for mdoc credential presentations.
 #[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
@@ -303,17 +303,39 @@ impl MdocZkVerifier {
         if statements.signature_statement().len() != self.signature_circuit.num_public_inputs() {
             return Err(anyhow!("statement length does not match signature circuit"));
         }
-        initialize_transcript(&mut transcript, &self.hash_circuit, statements.hash_statement())?;
-        let hash_linear_constraints = SumcheckProtocol::new(&self.hash_circuit)
-            .linear_constraints(statements.hash_statement(), &mut transcript, &proof.hash_sumcheck_proof)?;
-        self.hash_ligero_verifier.verify(
-            proof.hash_commitment, &proof.hash_ligero_proof, &mut transcript, &hash_linear_constraints,
+        initialize_transcript(
+            &mut transcript,
+            &self.hash_circuit,
+            statements.hash_statement(),
         )?;
-        initialize_transcript(&mut transcript, &self.signature_circuit, statements.signature_statement())?;
+        let hash_linear_constraints = SumcheckProtocol::new(&self.hash_circuit)
+            .linear_constraints(
+                statements.hash_statement(),
+                &mut transcript,
+                &proof.hash_sumcheck_proof,
+            )?;
+        self.hash_ligero_verifier.verify(
+            proof.hash_commitment,
+            &proof.hash_ligero_proof,
+            &mut transcript,
+            &hash_linear_constraints,
+        )?;
+        initialize_transcript(
+            &mut transcript,
+            &self.signature_circuit,
+            statements.signature_statement(),
+        )?;
         let signature_linear_constraints = SumcheckProtocol::new(&self.signature_circuit)
-            .linear_constraints(statements.signature_statement(), &mut transcript, &proof.signature_sumcheck_proof)?;
+            .linear_constraints(
+                statements.signature_statement(),
+                &mut transcript,
+                &proof.signature_sumcheck_proof,
+            )?;
         self.signature_ligero_verifier.verify(
-            proof.signature_commitment, &proof.signature_ligero_proof, &mut transcript, &signature_linear_constraints,
+            proof.signature_commitment,
+            &proof.signature_ligero_proof,
+            &mut transcript,
+            &signature_linear_constraints,
         )?;
         Ok(())
     }

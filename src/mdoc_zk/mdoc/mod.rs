@@ -309,15 +309,23 @@ impl<'de> serde::Deserialize<'de> for DeviceKeyInfo {
         };
         let mut device_key = None;
         for (k, v) in entries {
-            let ciborium::Value::Text(key_str) = k else { continue; };
+            let ciborium::Value::Text(key_str) = k else {
+                continue;
+            };
             if key_str == "deviceKey" {
                 device_key = Some(match v {
                     // Standard: deviceKey is a COSE_Key map directly
                     ciborium::Value::Map(_) => {
                         let mut buf = Vec::new();
-                        ciborium::into_writer(&ciborium::Value::Map(
-                            if let ciborium::Value::Map(m) = v { m } else { unreachable!() }
-                        ), &mut buf).map_err(D::Error::custom)?;
+                        ciborium::into_writer(
+                            &ciborium::Value::Map(if let ciborium::Value::Map(m) = v {
+                                m
+                            } else {
+                                unreachable!()
+                            }),
+                            &mut buf,
+                        )
+                        .map_err(D::Error::custom)?;
                         ciborium::from_reader::<CoseKey, _>(buf.as_slice())
                             .map_err(D::Error::custom)?
                     }
@@ -328,7 +336,8 @@ impl<'de> serde::Deserialize<'de> for DeviceKeyInfo {
                     }
                     other => {
                         return Err(D::Error::custom(format!(
-                            "deviceKey has unexpected type: {:?}", other
+                            "deviceKey has unexpected type: {:?}",
+                            other
                         )));
                     }
                 });

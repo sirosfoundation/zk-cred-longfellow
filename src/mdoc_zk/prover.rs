@@ -410,14 +410,23 @@ pub fn prove_with_ppid_wasm(
     verifier_context: &[u8],
 ) -> Result<Vec<u8>, wasm_bindgen::JsError> {
     if verifier_context.len() != 32 {
-        return Err(wasm_bindgen::JsError::new("verifier_context must be 32 bytes"));
+        return Err(wasm_bindgen::JsError::new(
+            "verifier_context must be 32 bytes",
+        ));
     }
     let ctx: &[u8; 32] = verifier_context
         .try_into()
         .map_err(|_| wasm_bindgen::JsError::new("verifier_context must be 32 bytes"))?;
     let claims: Vec<&str> = requested_claims.iter().map(|s| s.as_str()).collect();
     prover
-        .prove_internal(device_response, namespace, &claims, session_transcript, time, Some(ctx))
+        .prove_internal(
+            device_response,
+            namespace,
+            &claims,
+            session_transcript,
+            time,
+            Some(ctx),
+        )
         .map_err(|e| wasm_bindgen::JsError::new(&e.to_string()))
 }
 
@@ -448,50 +457,62 @@ pub fn verify_with_ppid_wasm(
     proof: &[u8],
 ) -> Result<(), wasm_bindgen::JsError> {
     if verifier_context.len() != 32 {
-        return Err(wasm_bindgen::JsError::new("verifier_context must be 32 bytes"));
+        return Err(wasm_bindgen::JsError::new(
+            "verifier_context must be 32 bytes",
+        ));
     }
     let ctx: &[u8; 32] = verifier_context
         .try_into()
         .map_err(|_| wasm_bindgen::JsError::new("verifier_context must be 32 bytes"))?;
-    verifier.verify_with_ppid(
-        issuer_public_key_sec1,
-        &[
-            crate::mdoc_zk::verifier::Attribute {
-                identifier: "given_name".to_owned(),
-                value_cbor: given_name_cbor.to_vec(),
-            },
-            crate::mdoc_zk::verifier::Attribute {
-                identifier: "pairwise_pseudonym".to_owned(),
-                value_cbor: ppid_cbor.to_vec(),
-            },
-        ],
-        doc_type,
-        b"\xa0",
-        session_transcript,
-        time,
-        ctx,
-        proof,
-    )
-    .map_err(|e| wasm_bindgen::JsError::new(&e.to_string()))
+    verifier
+        .verify_with_ppid(
+            issuer_public_key_sec1,
+            &[
+                crate::mdoc_zk::verifier::Attribute {
+                    identifier: "given_name".to_owned(),
+                    value_cbor: given_name_cbor.to_vec(),
+                },
+                crate::mdoc_zk::verifier::Attribute {
+                    identifier: "pairwise_pseudonym".to_owned(),
+                    value_cbor: ppid_cbor.to_vec(),
+                },
+            ],
+            doc_type,
+            b"\xa0",
+            session_transcript,
+            time,
+            ctx,
+            proof,
+        )
+        .map_err(|e| wasm_bindgen::JsError::new(&e.to_string()))
 }
 
 /// C FFI for Go CGo verifier.
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_verify_with_ppid(
-    circuit: *const u8, circuit_len: usize,
-    issuer_pk: *const u8, issuer_pk_len: usize,
-    given_name_cbor: *const u8, given_name_len: usize,
-    ppid_cbor: *const u8, ppid_len: usize,
+    circuit: *const u8,
+    circuit_len: usize,
+    issuer_pk: *const u8,
+    issuer_pk_len: usize,
+    given_name_cbor: *const u8,
+    given_name_len: usize,
+    ppid_cbor: *const u8,
+    ppid_len: usize,
     namespace: *const std::ffi::c_char,
     doc_type: *const std::ffi::c_char,
-    transcript: *const u8, transcript_len: usize,
+    transcript: *const u8,
+    transcript_len: usize,
     time: *const std::ffi::c_char,
     verifier_context: *const u8,
-    proof: *const u8, proof_len: usize,
+    proof: *const u8,
+    proof_len: usize,
 ) -> i32 {
-    use std::slice;
+    use crate::mdoc_zk::{
+        CircuitVersion,
+        verifier::{Attribute, MdocZkVerifier},
+    };
     use std::ffi::CStr;
-    use crate::mdoc_zk::{CircuitVersion, verifier::{Attribute, MdocZkVerifier}};
+    use std::slice;
 
     let result = std::panic::catch_unwind(|| -> Result<(), anyhow::Error> {
         unsafe {
@@ -510,10 +531,21 @@ pub extern "C" fn rust_verify_with_ppid(
             verifier.verify_with_ppid(
                 issuer_pk,
                 &[
-                    Attribute { identifier: "given_name".to_owned(), value_cbor: given_name },
-                    Attribute { identifier: "pairwise_pseudonym".to_owned(), value_cbor: ppid },
+                    Attribute {
+                        identifier: "given_name".to_owned(),
+                        value_cbor: given_name,
+                    },
+                    Attribute {
+                        identifier: "pairwise_pseudonym".to_owned(),
+                        value_cbor: ppid,
+                    },
                 ],
-                dt, b"\xa0", tr, t, ctx, proof,
+                dt,
+                b"\xa0",
+                tr,
+                t,
+                ctx,
+                proof,
             )
         }
     });
@@ -522,10 +554,10 @@ pub extern "C" fn rust_verify_with_ppid(
         Ok(Err(e)) => {
             eprintln!("rust_verify_with_ppid error: {:?}", e);
             -1
-        },
+        }
         Err(e) => {
             eprintln!("rust_verify_with_ppid panic: {:?}", e);
             -1
-        },
+        }
     }
 }
