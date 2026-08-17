@@ -1007,13 +1007,27 @@ fn signature_ligero_parameters(circuit_version: CircuitVersion) -> LigeroParamet
     };
     let inverse_rate = match circuit_version {
         CircuitVersion::V6 => LIGERO_INVERSE_RATE_V6,
-        CircuitVersion::V7 => LIGERO_INVERSE_RATE_V7,
-        CircuitVersion::V8 => LIGERO_INVERSE_RATE_V6, // same as V6
+        // Google's real reference (longfellow-zk's mdoc_zk.cc, both
+        // run_mdoc_prover and run_mdoc_verifier) selects Ligero rate/nreq
+        // via a plain `version < 7 ? kLigeroRate : kLigeroRatev7` threshold
+        // - there is no separate v8-specific constant anywhere upstream
+        // (v8 doesn't even exist in Google's own kZkSpecs table; it's a
+        // custom extension). "version < 7" naturally covers V8 on the V7
+        // side of that threshold, so V8 must use the V7 constants, not
+        // V6's - confirmed 2026-08-17 by reading longfellow-zk's actual
+        // C++ source directly. The previous "same as V6" here was an
+        // unverified guess (see git blame) and is the confirmed root cause
+        // of every real verifier rejecting our V8/PPID proofs with
+        // MDOC_VERIFIER_HASH_PARSING_FAILURE: a wrong inverse_rate/nreq
+        // produces a Ligero tableau shape that doesn't match what the real
+        // C++ verifier expects to deserialize, independent of any
+        // attribute/verifier_context content correctness.
+        CircuitVersion::V7 | CircuitVersion::V8 => LIGERO_INVERSE_RATE_V7,
     };
     let nreq = match circuit_version {
         CircuitVersion::V6 => LIGERO_NREQ_V6,
-        CircuitVersion::V7 => LIGERO_NREQ_V7,
-        CircuitVersion::V8 => LIGERO_NREQ_V6, // same as V6
+        // See inverse_rate's comment above for why V8 uses V7's constant.
+        CircuitVersion::V7 | CircuitVersion::V8 => LIGERO_NREQ_V7,
     };
     let block_size = (block_enc + 1) / (2 + inverse_rate);
     let witnesses_per_row = block_size - nreq;
@@ -1049,13 +1063,14 @@ fn hash_ligero_parameters(
     };
     let inverse_rate = match circuit_version {
         CircuitVersion::V6 => LIGERO_INVERSE_RATE_V6,
-        CircuitVersion::V7 => LIGERO_INVERSE_RATE_V7,
-        CircuitVersion::V8 => LIGERO_INVERSE_RATE_V6, // same as V6
+        // See signature_ligero_parameters's identical comment: Google's
+        // real `version < 7 ? kLigeroRate : kLigeroRatev7` threshold puts
+        // V8 on the V7 side, not V6's.
+        CircuitVersion::V7 | CircuitVersion::V8 => LIGERO_INVERSE_RATE_V7,
     };
     let nreq = match circuit_version {
         CircuitVersion::V6 => LIGERO_NREQ_V6,
-        CircuitVersion::V7 => LIGERO_NREQ_V7,
-        CircuitVersion::V8 => LIGERO_NREQ_V6, // same as V6
+        CircuitVersion::V7 | CircuitVersion::V8 => LIGERO_NREQ_V7,
     };
     let block_size = (block_enc + 1) / (2 + inverse_rate);
     let witnesses_per_row = block_size - nreq;
