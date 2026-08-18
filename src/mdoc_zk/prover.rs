@@ -116,7 +116,6 @@ impl MdocZkProver {
     /// `verifier_context` is a 32-byte value that binds the pseudonym to a
     /// specific verifier, ensuring different verifiers see different pseudonyms
     /// for the same credential holder.
-
     pub fn prove_with_ppid(
         &self,
         device_response: &[u8],
@@ -449,7 +448,7 @@ pub fn verify_with_ppid_wasm(
     issuer_public_key_sec1: &[u8],
     given_name_cbor: &[u8],
     ppid_cbor: &[u8],
-    namespace: &str,
+    _namespace: &str,
     doc_type: &str,
     session_transcript: &[u8],
     time: &str,
