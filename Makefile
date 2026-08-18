@@ -11,6 +11,10 @@
 #   make android        — cross-compile for Android (arm64, armv7, x86_64)
 #   make aar            — package Android AAR (requires android/ layout)
 #   make publish-local  — build AAR + POM and install to ~/.m2 (mavenLocal)
+#   make go-cabi        — build the plain C-ABI cdylib/staticlib for Go's
+#                          cgo verifier (default features, NOT
+#                          --features uniffi), staged alongside the
+#                          hand-written C header
 #   make clean          — remove build artifacts
 
 CRATE_NAME := zk_cred_longfellow
@@ -29,6 +33,7 @@ BINDINGS_DIR   := bindings
 SWIFT_DIR      := $(BINDINGS_DIR)/swift
 KOTLIN_DIR     := $(BINDINGS_DIR)/kotlin
 XCFRAMEWORK    := $(BUILD_DIR)/$(CRATE_NAME).xcframework
+GO_CABI_DIR    := $(BUILD_DIR)/go-cabi
 
 # iOS targets
 IOS_TARGETS      := aarch64-apple-ios
@@ -40,7 +45,7 @@ export IPHONEOS_DEPLOYMENT_TARGET ?= 16.0
 # Android targets (via cargo-ndk)
 ANDROID_TARGETS := aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
 
-.PHONY: all bindings bindings-swift bindings-kotlin ios android xcframework aar pom publish-local clean check-bindings
+.PHONY: all bindings bindings-swift bindings-kotlin ios android xcframework aar pom publish-local clean check-bindings go-cabi
 
 all: bindings
 
@@ -66,6 +71,35 @@ bindings-kotlin: $(BUILD_DIR)/release/$(LIB_NAME).$(HOST_LIB_EXT)
 
 $(BUILD_DIR)/release/$(LIB_NAME).$(HOST_LIB_EXT):
 	cargo build --release --features uniffi
+
+# ── Go (cgo) plain C-ABI build ───────────────────────────────────────
+#
+# `src/go_ffi.rs` exports a hand-written, ordinary `extern "C"` ABI for a
+# Go verifier service to call via cgo — separate from the UniFFI/RustBuffer
+# ABI in `ffi_api.rs` used by the Swift/Kotlin bindings above. UniFFI
+# doesn't target Go, and its RustBuffer wire protocol isn't cgo-friendly,
+# hence the separate hand-written ABI + header here.
+#
+# This target intentionally builds with the crate's *default* features
+# (no `--features uniffi`): the go_ffi module is always compiled in, and
+# building without uniffi keeps this artifact free of UniFFI's scaffolding
+# and its extra dependency graph, which Go/cgo callers have no use for.
+go-cabi: $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) $(GO_CABI_DIR)/$(LIB_NAME).a $(GO_CABI_DIR)/zk_cred_longfellow_go.h
+	@echo "Go C-ABI library + header staged in $(GO_CABI_DIR)"
+
+$(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT): $(GO_CABI_DIR)/zk_cred_longfellow_go.h
+	cargo build --release
+	@mkdir -p $(GO_CABI_DIR)
+	cp $(BUILD_DIR)/release/$(LIB_NAME).$(HOST_LIB_EXT) $(GO_CABI_DIR)/
+
+$(GO_CABI_DIR)/$(LIB_NAME).a: $(GO_CABI_DIR)/zk_cred_longfellow_go.h
+	cargo build --release
+	@mkdir -p $(GO_CABI_DIR)
+	cp $(BUILD_DIR)/release/$(LIB_NAME).a $(GO_CABI_DIR)/
+
+$(GO_CABI_DIR)/zk_cred_longfellow_go.h: include/zk_cred_longfellow_go.h
+	@mkdir -p $(GO_CABI_DIR)
+	cp include/zk_cred_longfellow_go.h $(GO_CABI_DIR)/
 
 # ── iOS cross-compilation (must run on macOS with Xcode toolchains) ─
 
@@ -191,4 +225,4 @@ check-bindings: bindings
 
 clean:
 	cargo clean
-	rm -rf $(BINDINGS_DIR) $(BUILD_DIR)/aar $(BUILD_DIR)/ios-sim-universal $(BUILD_DIR)/Headers
+	rm -rf $(BINDINGS_DIR) $(BUILD_DIR)/aar $(BUILD_DIR)/ios-sim-universal $(BUILD_DIR)/Headers $(GO_CABI_DIR)

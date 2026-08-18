@@ -487,77 +487,9 @@ pub fn verify_with_ppid_wasm(
         .map_err(|e| wasm_bindgen::JsError::new(&e.to_string()))
 }
 
-/// C FFI for Go CGo verifier.
-#[unsafe(no_mangle)]
-pub extern "C" fn rust_verify_with_ppid(
-    circuit: *const u8,
-    circuit_len: usize,
-    issuer_pk: *const u8,
-    issuer_pk_len: usize,
-    given_name_cbor: *const u8,
-    given_name_len: usize,
-    ppid_cbor: *const u8,
-    ppid_len: usize,
-    namespace: *const std::ffi::c_char,
-    doc_type: *const std::ffi::c_char,
-    transcript: *const u8,
-    transcript_len: usize,
-    time: *const std::ffi::c_char,
-    verifier_context: *const u8,
-    proof: *const u8,
-    proof_len: usize,
-) -> i32 {
-    use crate::mdoc_zk::{
-        CircuitVersion,
-        verifier::{Attribute, MdocZkVerifier},
-    };
-    use std::ffi::CStr;
-    use std::slice;
-
-    let result = std::panic::catch_unwind(|| -> Result<(), anyhow::Error> {
-        unsafe {
-            let circuit = slice::from_raw_parts(circuit, circuit_len);
-            let issuer_pk = slice::from_raw_parts(issuer_pk, issuer_pk_len);
-            let given_name = slice::from_raw_parts(given_name_cbor, given_name_len).to_vec();
-            let ppid = slice::from_raw_parts(ppid_cbor, ppid_len).to_vec();
-            let ns = CStr::from_ptr(namespace).to_str().unwrap_or("");
-            let dt = CStr::from_ptr(doc_type).to_str().unwrap_or("");
-            let tr = slice::from_raw_parts(transcript, transcript_len);
-            let t = CStr::from_ptr(time).to_str().unwrap_or("");
-            let ctx: &[u8; 32] = slice::from_raw_parts(verifier_context, 32).try_into()?;
-            let proof = slice::from_raw_parts(proof, proof_len);
-
-            let verifier = MdocZkVerifier::new(circuit, CircuitVersion::V8, 2)?;
-            verifier.verify_with_ppid(
-                issuer_pk,
-                &[
-                    Attribute {
-                        identifier: "given_name".to_owned(),
-                        value_cbor: given_name,
-                    },
-                    Attribute {
-                        identifier: "pairwise_pseudonym".to_owned(),
-                        value_cbor: ppid,
-                    },
-                ],
-                dt,
-                b"\xa0",
-                tr,
-                t,
-                ctx,
-                proof,
-            )
-        }
-    });
-    match result {
-        Ok(Ok(())) => 0,
-        Ok(Err(e)) => {
-            eprintln!("rust_verify_with_ppid error: {:?}", e);
-            -1
-        }
-        Err(e) => {
-            eprintln!("rust_verify_with_ppid panic: {:?}", e);
-            -1
-        }
-    }
-}
+// The plain C-ABI export for a Go (cgo) verifier ("rust_verify_with_ppid"
+// and friends) now lives in `crate::go_ffi`: it has grown well beyond a
+// hardcoded, single-purpose stub (variable-length attribute arrays, real
+// device_name_spaces_bytes, a cacheable verifier handle, and richer error
+// reporting), so it earns its own module rather than living inline here
+// alongside the WASM bindings.

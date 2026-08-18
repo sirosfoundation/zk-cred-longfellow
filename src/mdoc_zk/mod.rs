@@ -36,7 +36,7 @@ mod sha256;
 pub mod verifier;
 
 #[cfg(test)]
-mod prover_v8_test;
+pub(crate) mod prover_v8_test;
 
 /// Versions of the mdoc_zk circuit interface.
 #[derive(Debug, Clone, Copy)]
