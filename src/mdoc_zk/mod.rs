@@ -120,6 +120,7 @@ fn fill_ppid_witness<'a>(
 }
 impl CircuitInputs {
     /// Construct inputs for the signature and hash circuits.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         version: CircuitVersion,
         mdoc_device_response: &[u8],
@@ -327,12 +328,7 @@ impl CircuitInputs {
                             ppid_cbor.extend_from_slice(&ppid);
                             override_value = ppid_cbor;
                             pub_attr.value = std::borrow::Cow::Borrowed(&override_value);
-                        } else {
-                            override_value = Vec::new();
                         }
-                    } else {
-                        override_id = Vec::new();
-                        override_value = Vec::new();
                     }
                     fill_attribute_statement_v7(out_slice, &pub_attr)?;
                 }
@@ -1072,7 +1068,6 @@ fn signature_ligero_parameters(circuit_version: CircuitVersion) -> LigeroParamet
 }
 
 /// Hardcoded Ligero parameters for the hash circuit.
-
 fn hash_ligero_parameters(
     circuit_version: CircuitVersion,
     num_attributes: usize,
