@@ -255,7 +255,6 @@ const NAMESPACE: &str = "eu.europa.ec.eudi.pid.1";
 mod tests_v8_prover {
     use super::GARY_MDOC_HEX;
     use crate::mdoc_zk::{CircuitVersion, prover::MdocZkProver};
-    use sha2::{Digest, Sha256};
 
     const VERIFIER_CONTEXT: [u8; 32] = [
         0x76, 0x65, 0x72, 0x69, 0x66, 0x69, 0x65, 0x72, 0x40, 0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74,

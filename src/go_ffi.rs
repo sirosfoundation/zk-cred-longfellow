@@ -497,7 +497,7 @@ mod tests {
 
     fn load_v8_2attr_circuit() -> Vec<u8> {
         let compressed = include_bytes!(
-            "../circuits/8_2_4307_2945_bb8e6a26d2700ddad968562d1c4aee83067772fee6f889748a0bc64f2c694ad5"
+            "../test-vectors/mdoc_zk/8_2_4307_2945_bb8e6a26d2700ddad968562d1c4aee83067772fee6f889748a0bc64f2c694ad5"
         );
         zstd::decode_all(compressed.as_slice()).unwrap()
     }
