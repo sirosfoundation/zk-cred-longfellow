@@ -480,6 +480,7 @@ pub unsafe extern "C" fn rust_verify_with_ppid(
 mod tests {
     use super::*;
     use std::ffi::CString;
+    use wasm_bindgen_test::wasm_bindgen_test;
 
     // EU PID mdoc with pseudonym_seed, and its matching V8/2-attribute
     // circuit + fixed transcript/time/verifier_context. These mirror the
@@ -574,7 +575,7 @@ mod tests {
     /// Exercises the full lifecycle through the raw `extern "C"` functions
     /// exactly as a cgo caller would: initialize, verify (twice, to prove
     /// the handle is reusable and read-only), then free.
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn c_abi_round_trip_succeeds() {
         // SAFETY: test-only exercise of the raw C ABI with well-formed,
         // valid inputs constructed below (mirroring a well-behaved cgo
@@ -646,7 +647,7 @@ mod tests {
     /// A tampered proof must be rejected, and the rejection must come with a
     /// real (non-empty) error message via the out-parameter - i.e. richer
     /// than a bare status code.
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn c_abi_rejects_tampered_proof_with_error_message() {
         // SAFETY: as in `c_abi_round_trip_succeeds`.
         unsafe {
@@ -716,7 +717,7 @@ mod tests {
     /// cryptographic verification - and must not panic or read out of
     /// bounds, since this is exactly the kind of variable-length input Go
     /// controls.
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn c_abi_rejects_wrong_attribute_count() {
         // SAFETY: as in `c_abi_round_trip_succeeds`.
         unsafe {
@@ -770,7 +771,7 @@ mod tests {
     /// Null pointers where a value is required must produce a clean error,
     /// not a segfault/UB - this is the main risk cgo callers introduce (Go
     /// zero values are nil pointers).
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn c_abi_rejects_null_required_pointers() {
         // SAFETY: as in `c_abi_round_trip_succeeds`; the null pointers
         // passed below are exactly the invalid inputs each call is
@@ -848,7 +849,7 @@ mod tests {
 
     /// Rejects a `verifier_context` of the wrong length rather than reading
     /// past the caller's buffer.
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn c_abi_rejects_wrong_verifier_context_length() {
         // SAFETY: as in `c_abi_round_trip_succeeds`.
         unsafe {
@@ -910,7 +911,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn c_abi_rejects_unsupported_circuit_version() {
         // SAFETY: as in `c_abi_round_trip_succeeds`.
         unsafe {
@@ -929,7 +930,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn free_null_handles_are_a_no_op() {
         // SAFETY: null is always a valid, documented no-op input to these
         // free functions.
@@ -947,7 +948,7 @@ mod tests {
     /// Run explicitly via:
     ///
     ///   cargo test --release go_ffi::tests::dump_golden_fixture_for_go_smoke_test -- --ignored
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     #[ignore = "run explicitly to regenerate fixtures for the Go cgo smoke test"]
     fn dump_golden_fixture_for_go_smoke_test() {
         let golden = build_golden_proof();
