@@ -534,7 +534,7 @@ mod tests_v8_prover {
 
     fn load_v8_2attr_circuit() -> Vec<u8> {
         let compressed = include_bytes!(
-            "../../circuits/8_2_4307_2945_bb8e6a26d2700ddad968562d1c4aee83067772fee6f889748a0bc64f2c694ad5"
+            "../../test-vectors/mdoc_zk/8_2_4307_2945_bb8e6a26d2700ddad968562d1c4aee83067772fee6f889748a0bc64f2c694ad5"
         );
         zstd::decode_all(compressed.as_slice()).unwrap()
     }
@@ -614,16 +614,16 @@ mod tests_v8_prover {
     fn debug_ppid_attribute() {
         use crate::mdoc_zk::mdoc::{find_attributes, parse_device_response};
         let mdoc = parse_device_response(MDOC).unwrap();
+        // find_attributes() does exact, non-aliased matching; the mdoc's real attribute
+        // identifier for the pseudonym seed is "pseudonym_seed" (the "pairwise_pseudonym"
+        // name is only used at the public prove_with_ppid()/verify_with_ppid() API layer).
         let attrs = find_attributes(
             &mdoc.attribute_preimages,
             NAMESPACE,
-            &["given_name", "pairwise_pseudonym"],
+            &["given_name", "pseudonym_seed"],
         )
         .unwrap();
-        for (id, attr) in ["given_name", "pairwise_pseudonym"]
-            .iter()
-            .zip(attrs.iter())
-        {
+        for (id, attr) in ["given_name", "pseudonym_seed"].iter().zip(attrs.iter()) {
             eprintln!(
                 "attr id={} identifier={:?} value_bytes={:02x?} value_len={}",
                 id,
@@ -730,16 +730,16 @@ mod tests_v8_prover {
         use crate::mdoc_zk::mdoc::{find_attributes, parse_device_response};
         let mdoc_hex = GARY_MDOC_HEX;
         let mdoc = parse_device_response(&hex::decode(mdoc_hex.trim()).unwrap()).unwrap();
+        // find_attributes() does exact, non-aliased matching; query the mdoc's real
+        // "pseudonym_seed" attribute directly (the "pairwise_pseudonym" name only exists at
+        // the public prove_with_ppid()/verify_with_ppid() API layer).
         let attrs = find_attributes(
             &mdoc.attribute_preimages,
             "org.iso.18013.5.1",
-            &["given_name", "pairwise_pseudonym"],
+            &["given_name", "pseudonym_seed"],
         )
         .unwrap();
-        for (id, attr) in ["given_name", "pairwise_pseudonym"]
-            .iter()
-            .zip(attrs.iter())
-        {
+        for (id, attr) in ["given_name", "pseudonym_seed"].iter().zip(attrs.iter()) {
             eprintln!(
                 "attr={} identifier={:?} value={:02x?}",
                 id,
@@ -754,16 +754,16 @@ mod tests_v8_prover {
         use crate::mdoc_zk::mdoc::{find_attributes, parse_device_response};
         let mdoc_hex = GARY_MDOC_HEX;
         let mdoc = parse_device_response(&hex::decode(mdoc_hex.trim()).unwrap()).unwrap();
+        // find_attributes() does exact, non-aliased matching; query the mdoc's real
+        // "pseudonym_seed" attribute directly (the "pairwise_pseudonym" name only exists at
+        // the public prove_with_ppid()/verify_with_ppid() API layer).
         let attrs = find_attributes(
             &mdoc.attribute_preimages,
             "org.iso.18013.5.1",
-            &["given_name", "pairwise_pseudonym"],
+            &["given_name", "pseudonym_seed"],
         )
         .unwrap();
-        for (id, attr) in ["given_name", "pairwise_pseudonym"]
-            .iter()
-            .zip(attrs.iter())
-        {
+        for (id, attr) in ["given_name", "pseudonym_seed"].iter().zip(attrs.iter()) {
             eprintln!("attr={}", id);
             eprintln!(
                 "  digest_id:  offset={} length={}",
@@ -792,16 +792,18 @@ mod tests_v8_prover {
     fn debug_eu_offsets() {
         use crate::mdoc_zk::mdoc::{find_attributes, parse_device_response};
         let mdoc = parse_device_response(MDOC).unwrap();
+        // find_attributes() does exact, non-aliased matching; query the mdoc's real
+        // "pseudonym_seed" attribute directly (the "pairwise_pseudonym" name only exists at
+        // the public prove_with_ppid()/verify_with_ppid() API layer). Note: this test is
+        // already known to fail for an unrelated, pre-existing reason (namespace lookup),
+        // and is skipped in CI/regression runs - see the `--skip debug_eu_offsets` flag.
         let attrs = find_attributes(
             &mdoc.attribute_preimages,
             "org.iso.18013.5.1",
-            &["given_name", "pairwise_pseudonym"],
+            &["given_name", "pseudonym_seed"],
         )
         .unwrap();
-        for (id, attr) in ["given_name", "pairwise_pseudonym"]
-            .iter()
-            .zip(attrs.iter())
-        {
+        for (id, attr) in ["given_name", "pseudonym_seed"].iter().zip(attrs.iter()) {
             eprintln!("attr={}", id);
             eprintln!(
                 "  digest_id:  offset={} length={}",
