@@ -321,7 +321,7 @@ mod tests {
 
     #[wasm_bindgen_test(unsupported = test)]
     fn test_generate_proof() {
-        let compressed = include_bytes!("../../circuits/6_1_4096_2945_137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6").as_slice();
+        let compressed = include_bytes!("../../test-vectors/mdoc_zk/6_1_137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6").as_slice();
         let decompressed = zstd::decode_all(compressed).unwrap();
         let prover = MdocZkProver::new(&decompressed, CircuitVersion::V6, 1).unwrap();
         let test_vector_inputs = load_v6_v7_test_vector_inputs();
@@ -338,7 +338,7 @@ mod tests {
 
     #[wasm_bindgen_test(unsupported = test)]
     fn test_generate_proof_wrong_circuit_a() {
-        let compressed = include_bytes!("../../circuits/6_1_4096_2945_137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6").as_slice();
+        let compressed = include_bytes!("../../test-vectors/mdoc_zk/6_1_137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6").as_slice();
         let decompressed = zstd::decode_all(compressed).unwrap();
         let prover = MdocZkProver::new(&decompressed, CircuitVersion::V7, 1).unwrap();
         let test_vector_inputs = load_v6_v7_test_vector_inputs();
@@ -355,7 +355,7 @@ mod tests {
 
     #[wasm_bindgen_test(unsupported = test)]
     fn test_generate_proof_wrong_circuit_b() {
-        let compressed = include_bytes!("../../circuits/7_1_4151_4096_8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121").as_slice();
+        let compressed = include_bytes!("../../test-vectors/mdoc_zk/7_1_8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121").as_slice();
         let decompressed = zstd::decode_all(compressed).unwrap();
         let prover = MdocZkProver::new(&decompressed, CircuitVersion::V6, 1).unwrap();
         let test_vector_inputs = load_v6_v7_test_vector_inputs();
@@ -373,7 +373,7 @@ mod tests {
     /// Test V8 prover rejects missing verifier_context.
     #[wasm_bindgen_test(unsupported = test)]
     fn test_v8_requires_verifier_context() {
-        let compressed = include_bytes!("../../circuits/8_1_4259_2945_bd2d720cef03fe633646d66b510ea9a3b8515b645a76b5f71c9bc52e0220c8c7").as_slice();
+        let compressed = include_bytes!("../../test-vectors/mdoc_zk/8_1_4259_2945_bd2d720cef03fe633646d66b510ea9a3b8515b645a76b5f71c9bc52e0220c8c7").as_slice();
         let decompressed = zstd::decode_all(compressed).unwrap();
         let prover = MdocZkProver::new(&decompressed, CircuitVersion::V8, 1).unwrap();
         let test_vector_inputs = load_v6_v7_test_vector_inputs();

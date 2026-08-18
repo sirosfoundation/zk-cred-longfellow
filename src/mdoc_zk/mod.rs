@@ -37,8 +37,8 @@ pub mod verifier;
 
 #[cfg(test)]
 pub(crate) mod prover_v8_test;
-/// Versions of the mdoc_zk circuit interface.
 
+/// Versions of the mdoc_zk circuit interface.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[wasm_bindgen]
@@ -139,7 +139,26 @@ impl CircuitInputs {
         )?;
 
         let mdoc = parse_device_response(mdoc_device_response)?;
-        let attributes = find_attributes(&mdoc.attribute_preimages, namespace, attribute_ids)?;
+
+        // `find_attributes()` matches identifiers exactly against the mdoc's namespace-qualified
+        // `elementIdentifier` values, with no aliasing. V8's `pairwise_pseudonym` circuit
+        // attribute is derived from the mdoc's real `pseudonym_seed` attribute, so translate that
+        // one id here, at the call site that already knows about this namespace and circuit
+        // version, rather than baking a pseudonym-specific special case into the generic
+        // attribute lookup helper. `attribute_ids` (the original, public-facing ids) is kept
+        // around unchanged for the rest of this function.
+        let mdoc_attribute_ids: Vec<&str> = attribute_ids
+            .iter()
+            .map(|&id| {
+                if id == "pairwise_pseudonym" {
+                    "pseudonym_seed"
+                } else {
+                    id
+                }
+            })
+            .collect();
+        let attributes =
+            find_attributes(&mdoc.attribute_preimages, namespace, &mdoc_attribute_ids)?;
 
         let mut signature_input = vec![FieldP256::ZERO; layout.signature_input_length()];
         let mut split_signature_input = layout.split_signature_input(&mut signature_input);
@@ -1188,18 +1207,18 @@ pub(super) mod tests {
         attributes: u8,
     ) -> (Circuit<FieldP256>, Circuit<Field2_128>) {
         let data = match (version, attributes) {
-            (CircuitVersion::V6, 1) => include_bytes!("../../circuits/6_1_4096_2945_137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6").as_slice(),
-            (CircuitVersion::V6, 2) => include_bytes!("../../circuits/6_2_4025_2945_b4bb6f01b7043f4f51d8302a30b36e3d4d2d0efc3c24557ab9212ad524a9764e").as_slice(),
-            (CircuitVersion::V6, 3) => include_bytes!("../../circuits/6_3_4121_2945_b2211223b954b34a1081e3fbf71b8ea2de28efc888b4be510f532d6ba76c2010").as_slice(),
-            (CircuitVersion::V6, 4) => include_bytes!("../../circuits/6_4_4283_2945_c70b5f44a1365c53847eb8948ad5b4fdc224251a2bc02d958c84c862823c49d6").as_slice(),
-            (CircuitVersion::V7, 1) => include_bytes!("../../circuits/7_1_4151_4096_8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121").as_slice(),
-            (CircuitVersion::V7, 2) => include_bytes!("../../circuits/7_2_4265_4096_6a5810683e62b6d7766ebd0d7ca72518a2b8325418142adcadb10d51dbbcd5ad").as_slice(),
-            (CircuitVersion::V7, 3) => include_bytes!("../../circuits/7_3_4307_4096_8ee4849ae1293ae6fe5f9082ce3e5e15c4f198f2998c682fa1b727237d6d252f").as_slice(),
-            (CircuitVersion::V7, 4) => include_bytes!("../../circuits/7_4_4415_4096_5aebdaaafe17296a3ef3ca6c80c6e7505e09291897c39700410a365fb278e460").as_slice(),
-            (CircuitVersion::V8, 1) => include_bytes!("../../circuits/8_1_4259_2945_bd2d720cef03fe633646d66b510ea9a3b8515b645a76b5f71c9bc52e0220c8c7").as_slice(),
-            (CircuitVersion::V8, 2) => include_bytes!("../../circuits/8_2_4307_2945_bb8e6a26d2700ddad968562d1c4aee83067772fee6f889748a0bc64f2c694ad5").as_slice(),
-            (CircuitVersion::V8, 3) => include_bytes!("../../circuits/8_3_4463_2945_6d13de1b9925c820d9ee68a8b98695bf09003f09dd0bbfb1e2dadccc3170dc30").as_slice(),
-            (CircuitVersion::V8, 4) => include_bytes!("../../circuits/8_4_4481_2945_5f49898162ba507527e7c014d39db8509453fb2f1cd04601f629ce8363205073").as_slice(),
+            (CircuitVersion::V6, 1) => include_bytes!("../../test-vectors/mdoc_zk/6_1_137e5a75ce72735a37c8a72da1a8a0a5df8d13365c2ae3d2c2bd6a0e7197c7c6").as_slice(),
+            (CircuitVersion::V6, 2) => include_bytes!("../../test-vectors/mdoc_zk/6_2_b4bb6f01b7043f4f51d8302a30b36e3d4d2d0efc3c24557ab9212ad524a9764e").as_slice(),
+            (CircuitVersion::V6, 3) => include_bytes!("../../test-vectors/mdoc_zk/6_3_b2211223b954b34a1081e3fbf71b8ea2de28efc888b4be510f532d6ba76c2010").as_slice(),
+            (CircuitVersion::V6, 4) => include_bytes!("../../test-vectors/mdoc_zk/6_4_c70b5f44a1365c53847eb8948ad5b4fdc224251a2bc02d958c84c862823c49d6").as_slice(),
+            (CircuitVersion::V7, 1) => include_bytes!("../../test-vectors/mdoc_zk/7_1_8d079211715200ff06c5109639245502bfe94aa869908d31176aae4016182121").as_slice(),
+            (CircuitVersion::V7, 2) => include_bytes!("../../test-vectors/mdoc_zk/7_2_6a5810683e62b6d7766ebd0d7ca72518a2b8325418142adcadb10d51dbbcd5ad").as_slice(),
+            (CircuitVersion::V7, 3) => include_bytes!("../../test-vectors/mdoc_zk/7_3_8ee4849ae1293ae6fe5f9082ce3e5e15c4f198f2998c682fa1b727237d6d252f").as_slice(),
+            (CircuitVersion::V7, 4) => include_bytes!("../../test-vectors/mdoc_zk/7_4_5aebdaaafe17296a3ef3ca6c80c6e7505e09291897c39700410a365fb278e460").as_slice(),
+            (CircuitVersion::V8, 1) => include_bytes!("../../test-vectors/mdoc_zk/8_1_4259_2945_bd2d720cef03fe633646d66b510ea9a3b8515b645a76b5f71c9bc52e0220c8c7").as_slice(),
+            (CircuitVersion::V8, 2) => include_bytes!("../../test-vectors/mdoc_zk/8_2_4307_2945_bb8e6a26d2700ddad968562d1c4aee83067772fee6f889748a0bc64f2c694ad5").as_slice(),
+            (CircuitVersion::V8, 3) => include_bytes!("../../test-vectors/mdoc_zk/8_3_4463_2945_6d13de1b9925c820d9ee68a8b98695bf09003f09dd0bbfb1e2dadccc3170dc30").as_slice(),
+            (CircuitVersion::V8, 4) => include_bytes!("../../test-vectors/mdoc_zk/8_4_4481_2945_5f49898162ba507527e7c014d39db8509453fb2f1cd04601f629ce8363205073").as_slice(),
             _ => panic!("unsupported version/attributes combination"),
         };
         let decompressed = zstd::decode_all(data).unwrap();
