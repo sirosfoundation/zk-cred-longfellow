@@ -61,6 +61,9 @@ pub fn initialize_verifier(
 }
 
 /// Verify a proof of a credential presentation.
+///
+/// See [`crate::mdoc_zk::verifier::MdocZkVerifier::verify`]'s doc comment for `attributes`' ordering
+/// contract - it must match the exact order the prover used, caller-reconstructed.
 #[uniffi::export]
 pub fn verify(
     verifier: &MdocZkVerifier,
@@ -115,7 +118,10 @@ pub fn prove_with_ppid(
 
 /// Verify a proof with pairwise-pseudonym (PPID) support - V8 circuits only.
 /// `verifier_context` must match the value the prover used to derive the
-/// pseudonym.
+/// pseudonym. See [`crate::mdoc_zk::verifier::MdocZkVerifier::verify`]'s doc comment for
+/// `attributes`' ordering contract - it must match the exact order the
+/// prover used (originally-requested claims in request order, with
+/// "pairwise_pseudonym" always last), caller-reconstructed.
 #[uniffi::export]
 pub fn verify_with_ppid(
     verifier: &MdocZkVerifier,

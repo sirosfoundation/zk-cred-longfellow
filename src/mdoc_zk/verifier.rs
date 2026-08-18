@@ -58,6 +58,17 @@ impl MdocZkVerifier {
     ///   X.509 `SubjectPublicKeyInfo`.
     /// * `attributes`: The attributes disclosed in this presentation. For each attribute, the
     ///   attribute's identifier is given, along with the CBOR encoding if the attribute's value.
+    ///   **Order is caller-significant**: entries are matched against the circuit's public
+    ///   statement purely by position - `identifier` is not used to locate an attribute's slot
+    ///   (circuit slots carry no identifier semantics at all), so this slice must be in the exact
+    ///   same order the original prover used when generating `proof`, or verification will fail
+    ///   (there is no way for this function to detect or correct a wrong order). The convention
+    ///   this crate's own callers use (established in siros-sdk-kotlin's
+    ///   `LongfellowZkProofSystem.kt`, mirrored in siros-sdk-swift): the originally-requested
+    ///   claims in their request order, with `"pairwise_pseudonym"` always appended LAST when a
+    ///   PPID proof is involved. This crate has no visibility into the original request and
+    ///   cannot enforce that convention - reconstructing it correctly is the caller's
+    ///   responsibility on both the prove and verify sides.
     /// * `doc_type`: The document type of the credential.
     /// * `device_name_spaces_bytes`: The CBOR-encoded `DeviceNameSpacesBytes` from the
     ///   `DeviceResponse`. This part of a credential is only used for attributes that are asserted
@@ -241,7 +252,10 @@ impl MdocZkVerifier {
 /// Identifier and value of an attribute.
 ///
 /// This represents the verifier's view of a selectively disclosed attribute, with ergonomic
-/// handling of the element identifier as a `String`.
+/// handling of the element identifier as a `String`. See [`crate::mdoc_zk::verifier::MdocZkVerifier::verify`]'s `attributes`
+/// parameter doc comment for the ordering contract callers must follow - `identifier` here is
+/// carried for the caller's own bookkeeping/error messages, not used by this crate to determine
+/// slot order.
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct Attribute {
     /// Attribute identifier.

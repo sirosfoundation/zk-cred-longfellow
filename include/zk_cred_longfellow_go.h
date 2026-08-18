@@ -47,6 +47,26 @@ typedef struct MdocZkVerifier MdocZkVerifier;
  * `identifier` must be a NUL-terminated UTF-8 string.
  * `value_cbor` must point to at least `value_cbor_len` bytes (may be NULL
  * only if `value_cbor_len` is 0).
+ *
+ * ORDERING IS CALLER-SIGNIFICANT AND NOT VALIDATED HERE: the `attributes`
+ * array passed to rust_verify_with_ppid() is matched against the circuit's
+ * public statement PURELY BY POSITION - the `identifier` field is not used
+ * to locate an attribute's circuit slot (circuit slots carry no semantic
+ * identifier binding at all). The verifier therefore has no way to detect
+ * or correct a wrong order; it will simply fail (or, in principle, produce
+ * a statement that happens to still parse against the wrong attribute) if
+ * the array isn't in the exact same order the original prover used when
+ * generating the proof.
+ *
+ * The one convention this crate's own callers actually use (established in
+ * siros-sdk-kotlin's LongfellowZkProofSystem.kt, mirrored in
+ * siros-sdk-swift, and required of any verifier such as SUNET/vc) is: the
+ * originally-requested claims in their original request order, with
+ * "pairwise_pseudonym" always appended LAST when a PPID proof is being
+ * generated/verified. This crate cannot enforce that convention - it has
+ * no visibility into the original request - so any caller assembling this
+ * array (on either the prove or verify side) is responsible for
+ * reconstructing that exact order itself.
  */
 typedef struct {
     const char *identifier;
