@@ -5,6 +5,7 @@ pub(crate) const GARY_MDOC_HEX: &str = "a366737461747573006776657273696f6e63312e
 mod tests_v8_prover {
     use super::GARY_MDOC_HEX;
     use crate::mdoc_zk::{CircuitVersion, prover::MdocZkProver};
+    use wasm_bindgen_test::wasm_bindgen_test;
 
     const VERIFIER_CONTEXT: [u8; 32] = [
         0x76, 0x65, 0x72, 0x69, 0x66, 0x69, 0x65, 0x72, 0x40, 0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74,
@@ -246,7 +247,7 @@ mod tests_v8_prover {
         zstd::decode_all(compressed.as_slice()).unwrap()
     }
     /// Mirrors ppid_generation_circuit C++ test
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn test_ppid_prover_succeeds() {
         let circuit = load_v8_2attr_circuit();
         let prover = MdocZkProver::new(&circuit, CircuitVersion::V8, 2)
@@ -286,7 +287,7 @@ mod tests_v8_prover {
     }
 
     /// Mirrors test that prove() without context fails for V8
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn test_v8_prove_without_context_fails() {
         let circuit = load_v8_2attr_circuit();
         let prover = MdocZkProver::new(&circuit, CircuitVersion::V8, 2)
@@ -304,7 +305,7 @@ mod tests_v8_prover {
         println!("✅ correctly rejected missing verifier_context");
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn debug_v8_lengths() {
         use crate::mdoc_zk::{CircuitVersion, layout::InputLayout, tests::load_circuits};
         let (sig_circuit, hash_circuit) = load_circuits(CircuitVersion::V8, 2);
@@ -317,7 +318,7 @@ mod tests_v8_prover {
         eprintln!("hash diff (circuit - layout): {}", diff);
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn debug_ppid_attribute() {
         use crate::mdoc_zk::mdoc::{find_attributes, parse_device_response};
         let mdoc = parse_device_response(MDOC).unwrap();
@@ -341,7 +342,7 @@ mod tests_v8_prover {
         }
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn test_gary_mdoc() {
         let mdoc = hex::decode(GARY_MDOC_HEX).unwrap();
         let transcript = hex::decode("83f6f6847142726f7773657248616e646f76657276315820f93ebac4ce4d9901b9aea472145ae5421f8fbecbe5f0389683f59f08fcf90e455833a363636174016474797065016764657461696c73a1676261736555726c75687474703a2f2f6c6f63616c686f73743a3830383058203c79914b7f81a1c2558fc81619dd4a074d32143e6cf6895fe47da156d1c5b0ae").unwrap();
@@ -359,7 +360,7 @@ mod tests_v8_prover {
         assert!(result.is_ok());
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn test_gary_mdoc_verify() {
         use crate::mdoc_zk::{
             CircuitVersion,
@@ -432,7 +433,7 @@ mod tests_v8_prover {
         println!("✅ V8 verify_with_ppid succeeded!");
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn debug_gary_attrs() {
         use crate::mdoc_zk::mdoc::{find_attributes, parse_device_response};
         let mdoc_hex = GARY_MDOC_HEX;
@@ -456,7 +457,7 @@ mod tests_v8_prover {
         }
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn debug_gary_offsets() {
         use crate::mdoc_zk::mdoc::{find_attributes, parse_device_response};
         let mdoc_hex = GARY_MDOC_HEX;
@@ -495,8 +496,8 @@ mod tests_v8_prover {
         }
     }
 
-    #[test]
     #[ignore = "known-failing debug helper - see doc comment inside the test body"]
+    #[wasm_bindgen_test(unsupported = test)]
     fn debug_eu_offsets() {
         use crate::mdoc_zk::mdoc::{find_attributes, parse_device_response};
         let mdoc = parse_device_response(MDOC).unwrap();
@@ -540,7 +541,7 @@ mod tests_v8_prover {
         }
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn debug_gary_mso() {
         use crate::mdoc_zk::mdoc::parse_device_response;
         let mdoc_hex = GARY_MDOC_HEX;
@@ -563,7 +564,7 @@ mod tests_v8_prover {
         }
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn debug_gary_vs_eupid_mso() {
         use crate::mdoc_zk::mdoc::parse_device_response;
 
@@ -616,7 +617,7 @@ mod tests_v8_prover {
         }
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn debug_ppid_computation() {
         use sha2::{Digest, Sha256};
 
@@ -636,7 +637,7 @@ mod tests_v8_prover {
         eprintln!("verifier_context = {:02x?}", &ctx[..]);
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn debug_eu_mso_offsets() {
         use crate::mdoc_zk::mdoc::parse_device_response;
         let mdoc = parse_device_response(MDOC).unwrap();
@@ -649,7 +650,7 @@ mod tests_v8_prover {
         }
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn debug_sha256_inputs() {
         use crate::mdoc_zk::mdoc::parse_device_response;
 
@@ -679,7 +680,7 @@ mod tests_v8_prover {
         );
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn debug_gary_block_count() {
         use crate::mdoc_zk::layout::SHA_256_CREDENTIAL_MAX_BLOCKS_V7;
         use crate::mdoc_zk::mdoc::parse_device_response;
@@ -703,7 +704,7 @@ mod tests_v8_prover {
         eprintln!("Max blocks: {}", SHA_256_CREDENTIAL_MAX_BLOCKS_V7);
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn debug_validity_offsets() {
         use crate::mdoc_zk::mdoc::parse_device_response;
 
