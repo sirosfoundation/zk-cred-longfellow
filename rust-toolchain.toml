@@ -1,0 +1,25 @@
+# Pin the toolchain so CI can't break without a change in this repo.
+#
+# CI previously used `dtolnay/rust-toolchain@stable`, so every Rust release
+# was silently a CI change: 1.98.0 made clippy::chunks_exact_to_as_chunks
+# warn-by-default and turned `main` red with no commit behind it. rustup
+# honours this file for every cargo invocation in the repo, so local builds
+# and CI agree by construction.
+#
+# Bump deliberately, in its own commit, so a lint or codegen change is
+# attributable to that bump rather than to whatever merged that day.
+[toolchain]
+channel = "1.98.0"
+components = ["clippy", "rustfmt"]
+# Declared here rather than per-job in the workflows: the workflow's
+# `targets:` input installs them for whichever toolchain the action picked,
+# which is not necessarily this one.
+targets = [
+  "wasm32-unknown-unknown",
+  "aarch64-linux-android",
+  "armv7-linux-androideabi",
+  "x86_64-linux-android",
+  "aarch64-apple-ios",
+  "aarch64-apple-ios-sim",
+  "x86_64-apple-ios",
+]
