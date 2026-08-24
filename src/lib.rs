@@ -1,3 +1,23 @@
+// `clippy::chunks_exact_to_as_chunks` fires 13 times across `mdoc_zk`
+// (sha256.rs, mod.rs, layout.rs, bit_plucker.rs) since it became
+// warn-by-default in a recent clippy. Allowed rather than rewritten,
+// deliberately:
+//
+//  * It is purely stylistic. `as_chunks::<N>()` yields `&[T; N]` instead of
+//    `&[T]`; it buys no correctness and no measurable performance here.
+//  * Clippy's own autofix produces code that does not compile --
+//    `cargo clippy --fix --broken-code` rewrites 4 sites and the crate then
+//    fails with `E0747: type provided when a constant was expected`, because
+//    the suggestion emits `as_chunks::<Sha256BlockWitness::LENGTH>()`. If the
+//    machine-applicable fix is wrong, hand-applying it 13 times across
+//    SHA-256 and bit-plucking code is not a trade worth making.
+//  * This crate is a fork; every library-code change we add is divergence to
+//    carry when merging upstream.
+//
+// Revisit if the lint ever gains a correctness or performance rationale, or
+// once the suggestion actually compiles.
+#![allow(clippy::chunks_exact_to_as_chunks)]
+
 use anyhow::{Context, anyhow};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use crypto_common::{generic_array::GenericArray, typenum::U32};
