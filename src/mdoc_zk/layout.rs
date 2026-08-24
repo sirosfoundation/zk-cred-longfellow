@@ -629,7 +629,9 @@ pub(super) struct Sha256Witness<'a> {
 impl<'a> Sha256Witness<'a> {
     pub(super) fn iter_blocks(&'a mut self) -> impl Iterator<Item = Sha256BlockWitness<'a>> {
         self.input
-            .chunks_exact_mut(Sha256BlockWitness::LENGTH)
+            .as_chunks_mut::<{ Sha256BlockWitness::LENGTH }>()
+            .0
+            .iter_mut()
             .map(|input| {
                 let (message_schedule, input) = input.split_at_mut(48 * 32 / 4);
                 let (state_e_a, input) = input.split_at_mut(64 * 2 * 32 / 4);
