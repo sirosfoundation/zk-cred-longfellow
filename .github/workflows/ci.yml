@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Install Rust toolchain
+      # Version, components and targets all come from rust-toolchain.toml,
+      # which rustup honours for every cargo invocation here.
       uses: dtolnay/rust-toolchain@stable
-      with:
-        components: clippy, rustfmt
     - uses: actions/checkout@v5
     - name: Build
       run: cargo build
@@ -44,8 +44,6 @@ jobs:
     steps:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: wasm32-unknown-unknown
     - name: Install Node.js
       uses: actions/setup-node@v5
       with:
@@ -63,8 +61,6 @@ jobs:
     steps:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: wasm32-unknown-unknown
     - name: Install cargo-binstall
       uses: cargo-bins/cargo-binstall@v1.15.7
     - name: Install wasm-pack

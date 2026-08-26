@@ -1,0 +1,18 @@
+# Pin the toolchain so a Rust release can't change CI's result on its own.
+#
+# ci.yml used dtolnay/rust-toolchain@stable, which makes every Rust release
+# an unannounced CI change. Concretely: 1.98.0 made
+# clippy::chunks_exact_to_as_chunks warn-by-default, which fails the
+# `-Dwarnings` clippy job with no commit behind it.
+#
+# rustup honours this file for every cargo invocation in the repo, so local
+# builds and CI agree by construction. Bump it deliberately, in its own
+# commit, so a new lint or codegen change is attributable to that bump
+# rather than to whatever else merged that day.
+[toolchain]
+channel = "1.98.0"
+components = ["clippy", "rustfmt"]
+# Declared here rather than per-job in ci.yml: the workflow's `targets:`
+# input installs them for whichever toolchain the action selected, which is
+# not necessarily the one cargo ends up using.
+targets = ["wasm32-unknown-unknown"]
