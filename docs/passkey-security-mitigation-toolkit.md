@@ -5,8 +5,15 @@ Passkeys on the Web*](https://www.usenix.org/conference/usenixsecurity26/present
 35th USENIX Security Symposium, with a focus on **what tooling, libraries and software actually
 exist to mitigate each finding**.
 
-Artifacts (paper PDF, both tools, the intentionally-vulnerable learning platform):
-<https://github.com/RUB-NDS/state-of-passkeys-artifacts> (Zenodo DOI `10.5281/zenodo.17898769`).
+Project site: <https://passkeys.tools>. Artifacts (paper PDF, both tools, the
+intentionally-vulnerable learning platform): <https://github.com/RUB-NDS/state-of-passkeys-artifacts>
+(Zenodo DOI `10.5281/zenodo.17898769`).
+
+**Both tools are also hosted, so evaluating your own deployment needs no local install:**
+<https://attacker.passkeys.tools> (public PASSKEYS-ATTACKER instance, downloadable browser extension,
+preconfigured public database) and <https://radar.passkeys.tools> (live adoption statistics, per-source
+detection coverage, merged lists downloadable as JSON, and a public API). The whole stack is also
+containerised with Docker Compose for local deployment.
 
 ---
 
@@ -147,10 +154,14 @@ Concrete mitigations:
 
 ### Layer 4 — Testing: make the 28 detection methods a CI job
 
-- **[PASSKEYS-ATTACKER](https://github.com/RUB-NDS/state-of-passkeys-artifacts)** — the paper's own
-  tool, and the only one implementing all passive and active spec tests plus replay, key-swap,
-  user-swap and session-swap. The authors explicitly note that teams with automated account-management
-  tests can wire it in for fully automated evaluation. Do that.
+- **[PASSKEYS-ATTACKER](https://attacker.passkeys.tools)** — the paper's own tool, and the only one
+  implementing all passive and active spec tests plus replay, key-swap, user-swap and session-swap.
+  The authors explicitly note that teams with automated account-management tests can wire it in for
+  fully automated evaluation. Do that. Start with the hosted instance and its browser extension to
+  triage your deployment in an afternoon, then run the Docker Compose stack locally once you want it
+  in CI against a staging environment. The authors also intend to announce it to the passkey
+  standardization community and suggest extending it to test passkey *libraries* and third-party
+  providers — worth tracking if you depend on either.
 - **["Fun with Flags and Passkeys"](https://github.com/RUB-NDS/state-of-passkeys-artifacts/tree/main/learning)**
   — the deliberately vulnerable CTF-style platform covering the Table 2 vulnerabilities. Use it to
   train the team on what each failure looks like before auditing your own stack.
@@ -173,9 +184,11 @@ Concrete mitigations:
 
 ### Layer 5 — Continuous monitoring
 
-- **PASSKEYS-RADAR** and the **Well-Known Detector** from the artifacts repo: run them against your
-  own domain portfolio to see what you are advertising (`/.well-known/webauthn`,
-  `/.well-known/passkey-endpoints`) and catch drift.
+- **[PASSKEYS-RADAR](https://radar.passkeys.tools)** and the **Well-Known Detector** from the
+  artifacts repo: run them against your own domain portfolio to see what you are advertising
+  (`/.well-known/webauthn`, `/.well-known/passkey-endpoints`) and catch drift. The hosted instance
+  keeps scanning long-term and exposes merged lists as JSON plus a public API, so drift detection can
+  be a scheduled diff rather than a scanner you operate yourself.
 - **Signature counter regressions**: store the counter, and on a decrease raise a security event to
   your SIEM and prompt the user, rather than hard-blocking the login. Note the counter is zero for
   most synced passkeys, so treat it as a signal for roaming hardware authenticators only.
