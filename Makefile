@@ -45,7 +45,7 @@ export IPHONEOS_DEPLOYMENT_TARGET ?= 16.0
 # Android targets (via cargo-ndk)
 ANDROID_TARGETS := aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
 
-.PHONY: all bindings bindings-swift bindings-kotlin ios android xcframework aar pom publish-local clean check-bindings go-cabi
+.PHONY: go-cabi-nymauth-fixture go-cabi-nymauth-smoke all bindings bindings-swift bindings-kotlin ios android xcframework aar pom publish-local clean check-bindings go-cabi
 
 all: bindings
 
@@ -104,6 +104,14 @@ $(GO_CABI_DIR)/zk_cred_longfellow_go.h: include/zk_cred_longfellow_go.h
 $(GO_CABI_DIR)/zk_cred_longfellow_nymauth.h: include/zk_cred_longfellow_nymauth.h
 	@mkdir -p $(GO_CABI_DIR)
 	cp include/zk_cred_longfellow_nymauth.h $(GO_CABI_DIR)/
+
+# Go smoke test of the nym_auth verifier through the C ABI (needs `make go-cabi` first):
+# writes a real proof and the request values, then runs a cgo program against them.
+go-cabi-nymauth-fixture:
+	cargo test --release --lib nymauth::tests::dump_go_smoke_fixture -- --ignored
+
+go-cabi-nymauth-smoke: go-cabi go-cabi-nymauth-fixture
+	cd go-cabi-smoketest && GOWORK=off LD_LIBRARY_PATH=../$(GO_CABI_DIR) go run ./nymauth
 
 # ── iOS cross-compilation (must run on macOS with Xcode toolchains) ─
 

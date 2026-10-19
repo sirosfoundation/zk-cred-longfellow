@@ -108,3 +108,23 @@ Test vectors contain the RNG seed used to generate them, making it possible to r
 deterministically. Just set the `seed` variable in test functions
 `generate_1d_dense_array_bind_test_vector`, `generate_2d_sparse_array_bind_test_vector`, and
 `generate_3d_sparse_array_bind_gate_vector`.
+
+## nym_auth (`nymauth/`)
+
+Vectors for `src/nymauth/`, copied from the SIROS `nym-auth-circuits` archive (SIROS-owned) unless
+noted:
+
+- `mdoc-circuits.zst`: the signature and hash circuits (LFC2), one zstd frame
+  (`longfellow/mdoc/circuits.zst` of the archive).
+- `mdoc-hash-witness.bin.zst`, `mdoc-sig-witness.bin.zst`: the archive's complete input vectors for
+  verifier 1 (`longfellow/mdoc/test/*.bin`, zstd compressed with `zstd -19`), with `a_p,k = k + 1`.
+- `mdoc-proof.bin`: the archive's proof for verifier 1, made by Google's Rust runtime. Its pseudonym
+  is `155f4337...aad1`.
+- `nym-auth-mdoc.txt`, `pseudonym.json`, `verifier.json`: the reference credential (base64url
+  IssuerSigned), the holder seed and the two verifiers' values, and the request values
+  (`credential/` of the archive).
+- `challenge-vectors.json`: the shared SessionTranscript and `e2` vectors (SPEC.md section 3). It is
+  byte-identical in zk-cred-vega and zk-cred-longfellow; change it in both or neither.
+
+The unit tests check the witness builder against the witness files slot for slot, verify the archive's
+proof, and make new proofs; see `docs/NYMAUTH.md`.

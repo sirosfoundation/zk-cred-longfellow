@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 use std::fmt;
 
 /// Errors from the nym_auth prover and verifier. Nothing in this module panics on bad input; every

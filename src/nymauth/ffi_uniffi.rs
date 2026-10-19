@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 //! UniFFI surface of the nym_auth prover and verifier (Kotlin and Swift), separate from the
 //! generic mdoc entry points in [`crate::ffi_api`].
 //!
@@ -140,4 +142,49 @@ pub fn nymauth_verify(
         &request.pseudonym,
         &request.proof,
     )
+}
+
+impl std::fmt::Debug for NymAuthProveRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NymAuthProveRequest(redacted)")
+    }
+}
+
+impl std::fmt::Debug for NymAuthProveResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "NymAuthProveResponse({} proof bytes, redacted)",
+            self.proof.len()
+        )
+    }
+}
+
+/// Derives the SessionTranscript (the transcript seed) and `e2` (the challenge digest) for the
+/// DC API handover, exactly per SPEC.md section 3. `jwk_thumbprint` is the 32-byte thumbprint of
+/// the response-encryption key, or `None` for an unencrypted response. A verifier uses this
+/// for its own request instead of values from the holder.
+#[uniffi::export]
+pub fn nymauth_derive_challenge(
+    origin: String,
+    nonce: String,
+    doc_type: String,
+    jwk_thumbprint: Option<Vec<u8>>,
+) -> Result<super::NymAuthChallenge, NymAuthError> {
+    super::derive_challenge(&origin, &nonce, &doc_type, jwk_thumbprint.as_deref())
+}
+
+/// `e2` for a SessionTranscript already in hand and the credential's docType.
+#[uniffi::export]
+pub fn nymauth_challenge_digest(
+    session_transcript: Vec<u8>,
+    doc_type: String,
+) -> Result<Vec<u8>, NymAuthError> {
+    super::challenge_digest(&session_transcript, &doc_type).map(|d| d.to_vec())
+}
+
+/// `SHA-256(client_id)`, the request's `verifier_input`.
+#[uniffi::export]
+pub fn nymauth_verifier_input(client_id: String) -> Result<Vec<u8>, NymAuthError> {
+    super::verifier_input(&client_id).map(|d| d.to_vec())
 }

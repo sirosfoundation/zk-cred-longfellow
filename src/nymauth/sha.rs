@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 //! SHA-256 compression with the per-block "face" the nym_auth hash circuit consumes
 //! (SPEC.md section L4.1).
 
@@ -108,7 +110,9 @@ pub(super) fn faces_padded(p: &[u8], mut state: [u32; 8], out: &mut Vec<u8>) -> 
 
 /// faces(m, B) of the specification; `None` if `m` does not fit `blocks` blocks.
 pub(super) fn faces(m: &[u8], blocks: usize, out: &mut Vec<u8>) -> Option<()> {
-    faces_padded(&pad(m, blocks)?, IV, out);
+    // The message can be secret (the seed); its padded copy is wiped.
+    let padded = super::wipe::Wiped::new(pad(m, blocks)?, 0u8);
+    faces_padded(&padded, IV, out);
     Some(())
 }
 

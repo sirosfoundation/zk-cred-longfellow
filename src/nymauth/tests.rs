@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 //! End-to-end tests over the credential fixtures of the `nym-auth-circuits` archive (copied to
 //! `test-vectors/nymauth/`): the witness against the archive's complete input vectors, the
 //! archive's own proof, and real proofs made and checked here.
@@ -5,6 +7,12 @@
 use super::*;
 use crate::fields::{field2_128::Field2_128, fieldp256::FieldP256};
 use std::sync::OnceLock;
+
+/// The fixture build's circuit ids (also the profile table's entry).
+pub(super) const MDOC_HASH_CIRCUIT_ID: &str =
+    "5f8c75ae5c3893ef6ab6a079628cb385ba85e95a85437d58570c455289d75729";
+pub(super) const SIG_CIRCUIT_ID: &str =
+    "00513797c75b2eab1a9db75004977c15317d4e40c0db1d00674523431baa75cb";
 
 const CIRCUITS_ZST: &[u8] = include_bytes!("../../test-vectors/nymauth/mdoc-circuits.zst");
 const HASH_WITNESS_ZST: &[u8] =
@@ -444,7 +452,7 @@ fn verification_refuses_tampered_proofs_and_requests() {
     assert!(
         ok(
             &NymAuthRequest {
-                transcript_seed: b"another transcript",
+                transcript_seed: b"another transcript, long enough to pass the floor",
                 ..fx.request()
             },
             &pf.pseudonym,
@@ -566,6 +574,7 @@ fn prover_refuses_a_request_the_credential_does_not_meet() {
     unsatisfied(prover().prove(
         &NymAuthRequest {
             earliest: "9000-01-01",
+            cutoff: "9999-12-31",
             ..fx.request()
         },
         &fx.witness(),
@@ -673,7 +682,7 @@ fn circuit_ids_and_parameters_are_checked() {
     ));
     assert!(matches!(
         with(&|p| p.sig_circuit_id = "00".repeat(32)),
-        Some(NymAuthError::UnsupportedCircuit(_))
+        Some(NymAuthError::Circuit(_))
     ));
     assert!(matches!(
         with(&|p| p.block_enc_hash = 10),
@@ -843,6 +852,27 @@ mod c_abi_tests {
             assert_eq!(rc, -1);
             take_error(err);
             err = std::ptr::null_mut();
+            // A transcript seed under the floor is refused by both entry points.
+            let short = NymAuthCRequest {
+                transcript_seed: nb(b"short"),
+                ..creq(&fx)
+            };
+            assert_eq!(
+                nymauth_verify(v, &short, nb(&nym), nb(&pbytes), std::ptr::null_mut()),
+                -1
+            );
+            assert_eq!(
+                nymauth_prove(
+                    p,
+                    &short,
+                    &wit(&fx.seed),
+                    &mut proof2,
+                    &mut len2,
+                    nym2.as_mut_ptr(),
+                    std::ptr::null_mut()
+                ),
+                -1
+            );
             let nullbytes = NymAuthBytes {
                 ptr: std::ptr::null(),
                 len: 5,
@@ -1016,4 +1046,53 @@ fn dump_proof_for_the_reference_verifier() {
     let path = std::env::var("NYMAUTH_DUMP").unwrap();
     std::fs::write(&path, &pf.proof).unwrap();
     println!("{}", hex::encode(pf.pseudonym));
+}
+
+#[cfg(test)]
+mod adversarial;
+
+#[cfg(test)]
+mod hardening;
+
+#[cfg(test)]
+mod challenge;
+
+/// Fixtures for the Go cgo smoke test (`go-cabi-smoketest/nymauth`):
+/// `cargo test --release --lib nymauth::tests::dump_go -- --ignored` (or `make go-cabi-nymauth-fixture`).
+#[test]
+#[ignore = "writes files for the Go smoke test"]
+fn dump_go_smoke_fixture() {
+    let fx = Fx::load(0);
+    let pf = prover().prove(&fx.request(), &fx.witness()).unwrap();
+    let dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/go-cabi/testdata-nymauth");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("circuit.bin"), circuit()).unwrap();
+    std::fs::write(dir.join("proof.bin"), &pf.proof).unwrap();
+    let p = params();
+    let json = serde_json::json!({
+        "hash_circuit_id": p.hash_circuit_id,
+        "sig_circuit_id": p.sig_circuit_id,
+        "block_enc_hash": p.block_enc_hash,
+        "block_enc_sig": p.block_enc_sig,
+        "issuer_key_x": hex::encode(&fx.qx),
+        "issuer_key_y": hex::encode(&fx.qy),
+        "time": fx.time,
+        "earliest": fx.earliest,
+        "cutoff": fx.cutoff,
+        "origin": "https://verifier.example",
+        "nonce": "pOA0oqEAhLnqug2r7Ve4tQ",
+        "doc_type": "eu.europa.ec.eudi.nym_auth.1",
+        "client_id": "x509_san_dns:verifier.example",
+        "pseudonym": hex::encode(pf.pseudonym),
+        "challenge_digest": hex::encode(fx.e2),
+        "session_transcript": hex::encode(&fx.transcript),
+        "verifier_input": hex::encode(fx.vi),
+    });
+    std::fs::write(
+        dir.join("fixture.json"),
+        serde_json::to_vec_pretty(&json).unwrap(),
+    )
+    .unwrap();
+    println!("wrote {}", dir.display());
 }

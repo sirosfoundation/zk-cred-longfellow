@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 //! The hash circuit's semantic bits S for an mdoc nym_auth credential (SPEC.md L4.2).
 
 use super::{
@@ -24,6 +26,15 @@ pub(super) struct Parsed {
     /// Device key coordinates, big-endian.
     pub x: [u8; 32],
     pub y: [u8; 32],
+}
+
+impl Drop for Parsed {
+    fn drop(&mut self) {
+        super::wipe::wipe(&mut self.signed, 0);
+        super::wipe::wipe(&mut self.issuer_sig, 0);
+        super::wipe::wipe(&mut self.x, 0);
+        super::wipe::wipe(&mut self.y, 0);
+    }
 }
 
 /// The nym message DST || secret_seed || 0x00*32 || verifier_input (119 bytes).

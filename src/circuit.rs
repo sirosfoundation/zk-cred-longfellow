@@ -44,6 +44,22 @@ pub struct Circuit<FE> {
     pub(crate) id: Sha256Digest,
 }
 
+#[cfg(test)]
+thread_local! {
+    /// Test-only: evaluate despite failed assertions, so tests can build a cheating prover.
+    pub static TEST_LENIENT_EVALUATE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+fn lenient_evaluate() -> bool {
+    TEST_LENIENT_EVALUATE.with(|l| l.get())
+}
+
+#[cfg(not(test))]
+const fn lenient_evaluate() -> bool {
+    false
+}
+
 fn fmt_id(s: &Sha256Digest, f: &mut Formatter<'_>) -> fmt::Result {
     f.write_str(hex::encode(s.0).as_str())
 }
@@ -268,7 +284,7 @@ impl<FE: CodecFieldElement> Circuit<FE> {
             // expect that Q and Z are disjoint. We verify the latter in
             // roundtrip_circuit_test_vector.
             for gate_index in z_gate_indexes {
-                if !bool::from(gate_outputs[gate_index].is_zero()) {
+                if !bool::from(gate_outputs[gate_index].is_zero()) && !lenient_evaluate() {
                     return Err(anyhow!(
                         "in-circuit assertion failed at layer {layer_index}, gate {gate_index}"
                     ));

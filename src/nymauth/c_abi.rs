@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 //! Plain C ABI of the nym_auth prover and verifier, for cgo and other C callers.
 //!
 //! Same conventions as [`crate::go_ffi`]: opaque handles created with `Box::into_raw`, plain
@@ -375,6 +377,145 @@ pub unsafe extern "C" fn nymauth_verify(
     });
     match r {
         Ok(()) => 0,
+        Err((code, m)) => {
+            // SAFETY: per this function's contract.
+            unsafe { set_error(error_out, &m) };
+            code
+        }
+    }
+}
+
+/// Derives the SessionTranscript and `e2` per SPEC.md section 3 (see `challenge.rs`). On 0,
+/// `*transcript_out` / `*transcript_len_out` receive a buffer to release with
+/// [`nymauth_free_buffer`] and `digest_out` (32 bytes) receives `e2`. `jwk_thumbprint` of length
+/// 0 means "no thumbprint" (CBOR null); otherwise it must be 32 bytes.
+///
+/// # Safety
+/// The `NymAuthBytes` follow the rules of [`NymAuthBytes`]; `transcript_out` and
+/// `transcript_len_out` are writable; `digest_out` points to 32 writable bytes; `error_out` is
+/// null or writable.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nymauth_derive_challenge(
+    origin: NymAuthBytes,
+    nonce: NymAuthBytes,
+    doc_type: NymAuthBytes,
+    jwk_thumbprint: NymAuthBytes,
+    transcript_out: *mut *mut u8,
+    transcript_len_out: *mut usize,
+    digest_out: *mut u8,
+    error_out: *mut *mut c_char,
+) -> i32 {
+    // SAFETY: per this function's contract.
+    unsafe { clear_error(error_out) };
+    if transcript_out.is_null() || transcript_len_out.is_null() || digest_out.is_null() {
+        // SAFETY: per this function's contract.
+        unsafe { set_error(error_out, "nymauth invalid input: null argument") };
+        return -1;
+    }
+    let r = run(|| {
+        // SAFETY: per this function's contract.
+        let (o, n, d, t) = unsafe {
+            (
+                text(origin, "origin")?,
+                text(nonce, "nonce")?,
+                text(doc_type, "doc_type")?,
+                bytes(jwk_thumbprint, "jwk_thumbprint")?,
+            )
+        };
+        super::derive_challenge(o, n, d, (!t.is_empty()).then_some(t))
+    });
+    match r {
+        Ok(c) => {
+            let boxed = c.session_transcript.into_boxed_slice();
+            // SAFETY: outputs are writable per the contract; `digest_out` has 32 bytes and the
+            // digest is 32 bytes.
+            unsafe {
+                *transcript_len_out = boxed.len();
+                *transcript_out = Box::into_raw(boxed) as *mut u8;
+                std::ptr::copy_nonoverlapping(c.challenge_digest.as_ptr(), digest_out, 32);
+            }
+            0
+        }
+        Err((code, m)) => {
+            // SAFETY: per this function's contract.
+            unsafe { set_error(error_out, &m) };
+            code
+        }
+    }
+}
+
+/// `e2` for a SessionTranscript already in hand. On 0, `digest_out` (32 bytes) receives it.
+///
+/// # Safety
+/// The `NymAuthBytes` follow the rules of [`NymAuthBytes`]; `digest_out` points to 32 writable
+/// bytes; `error_out` is null or writable.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nymauth_challenge_digest(
+    session_transcript: NymAuthBytes,
+    doc_type: NymAuthBytes,
+    digest_out: *mut u8,
+    error_out: *mut *mut c_char,
+) -> i32 {
+    // SAFETY: per this function's contract.
+    unsafe { clear_error(error_out) };
+    if digest_out.is_null() {
+        // SAFETY: per this function's contract.
+        unsafe { set_error(error_out, "nymauth invalid input: null argument") };
+        return -1;
+    }
+    let r = run(|| {
+        // SAFETY: per this function's contract.
+        let (st, d) = unsafe {
+            (
+                bytes(session_transcript, "session_transcript")?,
+                text(doc_type, "doc_type")?,
+            )
+        };
+        super::challenge_digest(st, d)
+    });
+    match r {
+        Ok(d) => {
+            // SAFETY: `digest_out` has 32 writable bytes per the contract.
+            unsafe { std::ptr::copy_nonoverlapping(d.as_ptr(), digest_out, 32) };
+            0
+        }
+        Err((code, m)) => {
+            // SAFETY: per this function's contract.
+            unsafe { set_error(error_out, &m) };
+            code
+        }
+    }
+}
+
+/// `SHA-256(client_id)`, the request's `verifier_input`, into `digest_out` (32 bytes).
+///
+/// # Safety
+/// `client_id` follows the rules of [`NymAuthBytes`]; `digest_out` points to 32 writable bytes;
+/// `error_out` is null or writable.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nymauth_verifier_input(
+    client_id: NymAuthBytes,
+    digest_out: *mut u8,
+    error_out: *mut *mut c_char,
+) -> i32 {
+    // SAFETY: per this function's contract.
+    unsafe { clear_error(error_out) };
+    if digest_out.is_null() {
+        // SAFETY: per this function's contract.
+        unsafe { set_error(error_out, "nymauth invalid input: null argument") };
+        return -1;
+    }
+    let r = run(|| {
+        // SAFETY: per this function's contract.
+        let c = unsafe { text(client_id, "client_id") }?;
+        super::verifier_input(c)
+    });
+    match r {
+        Ok(d) => {
+            // SAFETY: `digest_out` has 32 writable bytes per the contract.
+            unsafe { std::ptr::copy_nonoverlapping(d.as_ptr(), digest_out, 32) };
+            0
+        }
         Err((code, m)) => {
             // SAFETY: per this function's contract.
             unsafe { set_error(error_out, &m) };

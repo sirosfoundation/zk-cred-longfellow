@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * zk_cred_longfellow_nymauth.h - hand-written C header for the nym_auth
  * prover and verifier of zk-cred-longfellow.
@@ -94,7 +95,9 @@ typedef struct {
 
 /*
  * Load the decompressed circuit artifact (signature circuit, then hash
- * circuit; LFC2 or legacy layout). Returns NULL on failure. Loading is the
+ * circuit, LFC2). The build must be on the crate's allowlist and the
+ * artifact's length, SHA-256 and the descriptor's parameters must equal its
+ * entry; anything else is refused (-2 or -3) before it is parsed. Returns NULL on failure. Loading is the
  * expensive step (about 0.15 s); keep the handle. Handles hold no interior
  * mutability: concurrent calls through one handle are fine.
  */
@@ -124,6 +127,45 @@ int32_t nymauth_verify(
     NymAuthBytes pseudonym,
     NymAuthBytes proof,
     char **error_out);
+
+/*
+ * The verifier's challenge, derived exactly as SPEC.md section 3 defines it.
+ * A verifier derives `challenge_digest` (e2) and `transcript_seed` (the
+ * SessionTranscript) here from its own origin, nonce and the credential's
+ * docType, and passes them in NymAuthCRequest; it does not take them from
+ * the holder.
+ *
+ * nymauth_derive_challenge(): on 0, `*transcript_out` / `*transcript_len_out`
+ * receive the SessionTranscript (release with nymauth_free_buffer()) and
+ * `digest_out` (32 bytes) receives e2. `jwk_thumbprint` of length 0 means no
+ * thumbprint (CBOR null); otherwise 32 bytes. Refuses (-1) an empty origin or
+ * docType, a nonce under 16 characters, fields over 4096 bytes and a
+ * thumbprint that is not 32 bytes.
+ *
+ * nymauth_challenge_digest(): e2 for a SessionTranscript already in hand (one
+ * definite CBOR array of three items, nothing after it).
+ *
+ * nymauth_verifier_input(): SHA-256(client_id), 32 bytes.
+ *
+ * Transcript seeds in NymAuthCRequest must be 32 to 65536 bytes.
+ */
+int32_t nymauth_derive_challenge(
+    NymAuthBytes origin,
+    NymAuthBytes nonce,
+    NymAuthBytes doc_type,
+    NymAuthBytes jwk_thumbprint,
+    uint8_t **transcript_out,
+    size_t *transcript_len_out,
+    uint8_t *digest_out,
+    char **error_out);
+
+int32_t nymauth_challenge_digest(
+    NymAuthBytes session_transcript,
+    NymAuthBytes doc_type,
+    uint8_t *digest_out,
+    char **error_out);
+
+int32_t nymauth_verifier_input(NymAuthBytes client_id, uint8_t *digest_out, char **error_out);
 
 void nymauth_free_buffer(uint8_t *ptr, size_t len);
 void nymauth_free_error_string(char *s);

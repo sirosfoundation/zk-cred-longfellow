@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 //! The `nymauth` prover and verifier: the two-circuit Longfellow proof for the nym_auth mdoc
 //! circuits of the `nym-auth-circuits` archive (SPEC.md sections L3 to L6).
 //!
@@ -21,6 +23,7 @@
 //! and is refused as an unknown circuit id.
 
 mod cbor;
+mod challenge;
 mod ecdsa;
 mod error;
 mod lfc2;
@@ -35,8 +38,10 @@ pub mod c_abi;
 #[cfg(feature = "uniffi")]
 pub mod ffi_uniffi;
 
+pub use challenge::{
+    MIN_NONCE_CHARS, NymAuthChallenge, challenge_digest, derive_challenge, verifier_input,
+};
 pub use error::NymAuthError;
-pub use profile::{MDOC_HASH_CIRCUIT_ID, SIG_CIRCUIT_ID};
 
 use crate::{
     Codec, ParameterizedCodec,
@@ -96,15 +101,18 @@ pub struct NymAuthRequest<'a> {
     pub earliest: &'a str,
     /// `C`: `YYYY-MM-DD`, `9999-12-31` for no upper bound.
     pub cutoff: &'a str,
-    /// `e2`: SHA-256 of the COSE message the device key signed.
+    /// `e2`: SHA-256 of the COSE message the device key signed. A verifier derives it with
+    /// [`derive_challenge`] from its own origin, nonce and the credential's docType.
     pub challenge_digest: &'a [u8],
     /// `SHA-256(verifier_id)`.
     pub verifier_input: &'a [u8],
-    /// The Fiat-Shamir seed both sides bind the proof to (the SessionTranscript).
+    /// The Fiat-Shamir seed both sides bind the proof to: the SessionTranscript from
+    /// [`derive_challenge`]. Between [`MIN_TRANSCRIPT_SEED_LEN`] and [`MAX_TRANSCRIPT_SEED_LEN`]
+    /// bytes; shorter seeds, such as an empty one, are refused.
     pub transcript_seed: &'a [u8],
 }
 
-/// The holder's private inputs.
+/// The holder's private inputs. `Debug` prints sizes only.
 pub struct NymAuthWitnessInput<'a> {
     /// The credential's IssuerSigned structure as CBOR.
     pub issuer_signed: &'a [u8],
@@ -115,13 +123,29 @@ pub struct NymAuthWitnessInput<'a> {
     pub device_signature: &'a [u8],
 }
 
-/// A proof and the pseudonym it reports.
-#[derive(Debug, Clone, PartialEq, Eq)]
+impl std::fmt::Debug for NymAuthWitnessInput<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NymAuthWitnessInput(redacted)")
+    }
+}
+
+/// A proof and the pseudonym it reports. `Debug` prints sizes only.
+#[derive(Clone, PartialEq, Eq)]
 pub struct NymAuthProof {
     /// The proof, in the layout of Google's `MdocProof::write`.
     pub proof: Vec<u8>,
     /// `SHA-256(DST || secret_seed || 0x00*32 || verifier_input)`.
     pub pseudonym: [u8; 32],
+}
+
+impl std::fmt::Debug for NymAuthProof {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "NymAuthProof({} proof bytes, redacted)",
+            self.proof.len()
+        )
+    }
 }
 
 fn invalid(m: impl Into<String>) -> NymAuthError {
@@ -145,14 +169,79 @@ struct Checked<'a> {
     seed: &'a [u8],
 }
 
-fn check<'a>(r: &NymAuthRequest<'a>) -> Result<Checked<'a>, NymAuthError> {
-    if r.time.len() != TIME_LEN || !r.time.is_ascii() {
-        return Err(invalid("time must be 20 ASCII characters"));
+/// Shortest accepted transcript seed. A SessionTranscript with a 32-byte handover hash is longer
+/// than 50 bytes; this floor only rejects empty and trivial seeds, it does not parse the format.
+pub const MIN_TRANSCRIPT_SEED_LEN: usize = 32;
+/// Longest accepted transcript seed.
+pub const MAX_TRANSCRIPT_SEED_LEN: usize = 1 << 16;
+
+fn digits(b: &[u8]) -> Option<u32> {
+    b.iter().try_fold(0u32, |v, &c| {
+        c.is_ascii_digit().then(|| v * 10 + u32::from(c - b'0'))
+    })
+}
+
+fn days_in_month(y: u32, m: u32) -> u32 {
+    match m {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        _ if y.is_multiple_of(4) && (!y.is_multiple_of(100) || y.is_multiple_of(400)) => 29,
+        _ => 28,
     }
-    for (n, v) in [("earliest", r.earliest), ("cutoff", r.cutoff)] {
-        if v.len() != DATE_LEN || !v.is_ascii() {
-            return Err(invalid(format!("{n} must be 10 ASCII characters")));
+}
+
+/// `YYYY-MM-DD`, digits only and calendar-valid (year 0001 to 9999). With `allow_zero`, the
+/// sentinel `0000-00-00` (no lower bound) is accepted too.
+fn valid_date(d: &[u8], allow_zero: bool) -> bool {
+    if d.len() != DATE_LEN || d[4] != b'-' || d[7] != b'-' {
+        return false;
+    }
+    if allow_zero && d == b"0000-00-00" {
+        return true;
+    }
+    match (digits(&d[..4]), digits(&d[5..7]), digits(&d[8..])) {
+        (Some(y), Some(m), Some(day)) => {
+            y >= 1 && (1..=12).contains(&m) && (1..=days_in_month(y, m)).contains(&day)
         }
+        _ => false,
+    }
+}
+
+/// `YYYY-MM-DDThh:mm:ssZ`, digits only and calendar-valid.
+fn valid_time(t: &[u8]) -> bool {
+    t.len() == TIME_LEN
+        && t[10] == b'T'
+        && t[19] == b'Z'
+        && t[13] == b':'
+        && t[16] == b':'
+        && valid_date(&t[..10], false)
+        && matches!(
+            (digits(&t[11..13]), digits(&t[14..16]), digits(&t[17..19])),
+            (Some(h), Some(m), Some(s)) if h < 24 && m < 60 && s < 60
+        )
+}
+
+fn check<'a>(r: &NymAuthRequest<'a>) -> Result<Checked<'a>, NymAuthError> {
+    if !valid_time(r.time.as_bytes()) {
+        return Err(invalid(
+            "time must be a calendar-valid YYYY-MM-DDThh:mm:ssZ",
+        ));
+    }
+    if !valid_date(r.earliest.as_bytes(), true) {
+        return Err(invalid(
+            "earliest must be a calendar-valid YYYY-MM-DD or 0000-00-00",
+        ));
+    }
+    if !valid_date(r.cutoff.as_bytes(), false) {
+        return Err(invalid("cutoff must be a calendar-valid YYYY-MM-DD"));
+    }
+    if r.earliest > r.cutoff {
+        return Err(invalid("earliest is after cutoff"));
+    }
+    if !(MIN_TRANSCRIPT_SEED_LEN..=MAX_TRANSCRIPT_SEED_LEN).contains(&r.transcript_seed.len()) {
+        return Err(invalid(format!(
+            "transcript_seed must be {MIN_TRANSCRIPT_SEED_LEN} to {MAX_TRANSCRIPT_SEED_LEN} bytes"
+        )));
     }
     Ok(Checked {
         qx: array(r.issuer_key_x, "issuer_key_x")?,
@@ -221,7 +310,7 @@ fn pseudonym_halves(nym: &[u8; 32]) -> Result<[G; 2], NymAuthError> {
     ])
 }
 
-/// The public part of the signature input vector (everything below slot 1155) from the request;
+/// The public part of the signature input vector (everything below `sig_npub`) from the request;
 /// a_v and the tags are filled by [`set_mac_public`].
 fn sig_public_base(p: &Profile, c: &Checked<'_>) -> Result<Vec<P>, NymAuthError> {
     let fx = ecdsa::fe_be(&c.qx).map_err(|_| invalid("issuer_key_x is not below p"))?;
@@ -247,13 +336,13 @@ fn set_mac_public(
     let av = g_to_u128(a_v)?;
     h[p.hash_npub - 3] = *a_v;
     for j in 0..128 {
-        s[259 + j] = pbit(((av >> j) & 1) as usize);
+        s[p.sig_av() + j] = pbit(((av >> j) & 1) as usize);
     }
     for (k, tag) in tags.iter().enumerate() {
         h[p.hash_npub - 9 + k] = *tag;
         let t = g_to_u128(tag)?;
         for j in 0..128 {
-            s[387 + 128 * k + j] = pbit(((t >> j) & 1) as usize);
+            s[p.sig_tags() + 128 * k + j] = pbit(((t >> j) & 1) as usize);
         }
     }
     Ok(())
@@ -272,13 +361,13 @@ fn set_prover_key_shares(
     p: &Profile,
     h: &mut [G],
     s: &mut [P],
-    a_p: &[G; 6],
+    a_p: &[G],
 ) -> Result<(), NymAuthError> {
     for (k, a) in a_p.iter().enumerate() {
         h[p.hash_ninputs - 6 + k] = *a;
         let av = g_to_u128(a)?;
         for j in 0..128 {
-            s[1155 + 128 * k + j] = pbit(((av >> j) & 1) as usize);
+            s[p.sig_ap() + 128 * k + j] = pbit(((av >> j) & 1) as usize);
         }
     }
     Ok(())
@@ -310,37 +399,65 @@ struct Loaded {
 }
 
 fn load(circuit: &[u8], params: &NymAuthCircuitParams) -> Result<Loaded, NymAuthError> {
+    // Everything trusted about a circuit comes from the allowlisted profile, never from the
+    // descriptor or the artifact: unlisted builds fail here, before any parsing.
     let profile = profile::for_hash_circuit(&params.hash_circuit_id)?;
-    if !params.sig_circuit_id.eq_ignore_ascii_case(SIG_CIRCUIT_ID) {
-        return Err(NymAuthError::UnsupportedCircuit(format!(
-            "unknown signature circuit {}",
-            params.sig_circuit_id
-        )));
+    if !params
+        .sig_circuit_id
+        .eq_ignore_ascii_case(profile.sig_circuit_id)
+    {
+        return Err(NymAuthError::Circuit(
+            "signature circuit id does not match the profile".into(),
+        ));
     }
-    // The catalog serves LFC2 pairs; the circuit type here reads the legacy layout.
+    if params.block_enc_hash != profile.block_enc_hash
+        || params.block_enc_sig != profile.block_enc_sig
+    {
+        return Err(NymAuthError::Circuit(
+            "block_enc does not match the profile".into(),
+        ));
+    }
+    // Authenticate the artifact before touching its contents: its sizes are untrusted.
+    if circuit.len() != profile.artifact_len
+        || !hex::encode(sha256(circuit)).eq_ignore_ascii_case(profile.artifact_sha256)
+    {
+        return Err(NymAuthError::Circuit(
+            "circuit artifact does not match the profile's length and SHA-256".into(),
+        ));
+    }
     let legacy = lfc2::to_legacy_pair(circuit)?;
-    let circuit = &legacy[..];
-    let mut cursor = Cursor::new(circuit);
+    decode_pair(&legacy, params, profile)
+}
+
+/// Decodes the two circuits from the legacy layout and checks them against the profile. The
+/// transcript binds each circuit's stored id, so the stored id must equal the recomputed one.
+fn decode_pair(
+    legacy: &[u8],
+    params: &NymAuthCircuitParams,
+    profile: Profile,
+) -> Result<Loaded, NymAuthError> {
+    let mut cursor = Cursor::new(legacy);
     let sig: Circuit<P> = Circuit::decode(&mut cursor)
         .map_err(|e| NymAuthError::Circuit(format!("signature circuit: {e:#}")))?;
     let hash: Circuit<G> = Circuit::decode(&mut cursor)
         .map_err(|e| NymAuthError::Circuit(format!("hash circuit: {e:#}")))?;
-    if cursor.position() as usize != circuit.len() {
+    if cursor.position() as usize != legacy.len() {
         return Err(NymAuthError::Circuit(
             "bytes left over after the hash circuit".into(),
         ));
     }
-    let id = |d: crate::Sha256Digest| hex::encode(d.0);
-    let sig_id = sig
-        .circuit_id()
-        .map(id)
-        .map_err(|e| NymAuthError::Circuit(e.to_string()))?;
-    let hash_id = hash
-        .circuit_id()
-        .map(id)
-        .map_err(|e| NymAuthError::Circuit(e.to_string()))?;
-    if !sig_id.eq_ignore_ascii_case(&params.sig_circuit_id)
-        || !hash_id.eq_ignore_ascii_case(&params.hash_circuit_id)
+    let recomputed = |what: &str, d: Result<crate::Sha256Digest, anyhow::Error>| {
+        d.map_err(|e| NymAuthError::Circuit(format!("{what} circuit id: {e}")))
+    };
+    let sig_id = recomputed("signature", sig.circuit_id())?;
+    let hash_id = recomputed("hash", hash.circuit_id())?;
+    if sig.id != sig_id || hash.id != hash_id {
+        return Err(NymAuthError::Circuit(
+            "a circuit's stored id differs from its recomputed id".into(),
+        ));
+    }
+    if !hex::encode(sig_id.0).eq_ignore_ascii_case(&params.sig_circuit_id)
+        || !hex::encode(hash_id.0).eq_ignore_ascii_case(&params.hash_circuit_id)
     {
         return Err(NymAuthError::Circuit(
             "circuit bytes do not match the descriptor's circuit ids".into(),
@@ -356,9 +473,9 @@ fn load(circuit: &[u8], params: &NymAuthCircuitParams) -> Result<Loaded, NymAuth
         ));
     }
     Ok(Loaded {
+        hash_params: ligero_parameters(profile.block_enc_hash)?,
+        sig_params: ligero_parameters(profile.block_enc_sig)?,
         profile,
-        hash_params: ligero_parameters(params.block_enc_hash)?,
-        sig_params: ligero_parameters(params.block_enc_sig)?,
         sig,
         hash,
     })
@@ -469,7 +586,7 @@ impl NymAuthProver {
         w: &NymAuthWitnessInput<'_>,
     ) -> Result<Built, NymAuthError> {
         let p = &self.l.profile;
-        let dev_sig: [u8; 64] = array(w.device_signature, "device_signature")?;
+        let dev_sig = wipe::SecretArray(array::<64>(w.device_signature, "device_signature")?);
         // Our own copy of the seed, wiped on every exit path.
         let seed_copy = wipe::SecretArray(array::<16>(w.secret_seed, "secret_seed")?);
         let seed = &seed_copy.0;
@@ -499,32 +616,33 @@ impl NymAuthProver {
         drop(sem);
 
         // Signature input vector.
-        let e_digest = sha256(&parsed.signed);
+        let e_digest = wipe::SecretArray(sha256(&parsed.signed));
         let mut s = Wiped::new(sig_public_base(p, c)?, P::ZERO);
         s.resize(p.sig_ninputs, P::ZERO);
         for i in 0..256 {
-            s[1923 + i] = pbit(ecdsa::bit(&e_digest, i));
-            s[2179 + i] = pbit(ecdsa::bit(&parsed.x, i));
-            s[2435 + i] = pbit(ecdsa::bit(&parsed.y, i));
+            s[p.sig_e() + i] = pbit(ecdsa::bit(&e_digest.0, i));
+            s[p.sig_x() + i] = pbit(ecdsa::bit(&parsed.x, i));
+            s[p.sig_y() + i] = pbit(ecdsa::bit(&parsed.y, i));
         }
-        let (r_iss, s_iss): ([u8; 32], [u8; 32]) = (
-            array(&parsed.issuer_sig[..32], "issuer signature")?,
-            array(&parsed.issuer_sig[32..], "issuer signature")?,
+        let (r_iss, s_iss) = (
+            wipe::SecretArray(array::<32>(&parsed.issuer_sig[..32], "issuer signature")?),
+            wipe::SecretArray(array::<32>(&parsed.issuer_sig[32..], "issuer signature")?),
         );
-        let iss = ecdsa::verification(&c.qx, &c.qy, &e_digest, &r_iss, &s_iss)
+        let iss = ecdsa::verification(&c.qx, &c.qy, &e_digest.0, &r_iss.0, &s_iss.0)
             .map_err(|_| NymAuthError::Unsatisfied("issuer signature does not verify".into()))?;
         let dev_key = (
-            ecdsa::reduce_mod_p(&parsed.x),
-            ecdsa::reduce_mod_p(&parsed.y),
+            wipe::SecretArray(ecdsa::reduce_mod_p(&parsed.x)),
+            wipe::SecretArray(ecdsa::reduce_mod_p(&parsed.y)),
         );
-        let (r_dev, s_dev): ([u8; 32], [u8; 32]) = (
-            array(&dev_sig[..32], "device signature")?,
-            array(&dev_sig[32..], "device signature")?,
+        let (r_dev, s_dev) = (
+            wipe::SecretArray(array::<32>(&dev_sig.0[..32], "device signature")?),
+            wipe::SecretArray(array::<32>(&dev_sig.0[32..], "device signature")?),
         );
-        let dev = ecdsa::verification(&dev_key.0, &dev_key.1, &c.e2, &r_dev, &s_dev)
+        let dev = ecdsa::verification(&dev_key.0.0, &dev_key.1.0, &c.e2, &r_dev.0, &s_dev.0)
             .map_err(|_| NymAuthError::Unsatisfied("device signature does not verify".into()))?;
-        s[2691..2691 + ecdsa::TRACE_LEN].copy_from_slice(&iss);
-        s[2691 + ecdsa::TRACE_LEN..2691 + 2 * ecdsa::TRACE_LEN].copy_from_slice(&dev);
+        let at = p.sig_issuer_trace();
+        s[at..at + ecdsa::TRACE_LEN].copy_from_slice(&iss);
+        s[at + ecdsa::TRACE_LEN..at + 2 * ecdsa::TRACE_LEN].copy_from_slice(&dev);
 
         // MAC messages.
         let half = |v: &[u8; 32]| -> Result<[G; 2], NymAuthError> {
@@ -533,7 +651,7 @@ impl NymAuthProver {
                 g_from_u128(u128::from_be_bytes(array(&v[..16], "half")?))?,
             ])
         };
-        let (me, mx, my) = (half(&e_digest)?, half(&parsed.x)?, half(&parsed.y)?);
+        let (me, mx, my) = (half(&e_digest.0)?, half(&parsed.x)?, half(&parsed.y)?);
         let msgs = [me[0], me[1], mx[0], mx[1], my[0], my[1]];
         Ok(Built {
             h,
@@ -551,7 +669,9 @@ impl NymAuthProver {
         s: &[P],
     ) -> Result<(crate::circuit::Evaluation<G>, crate::circuit::Evaluation<P>), NymAuthError> {
         // Evaluation fails on an in-circuit assertion: the statement is false.
-        let unsat = |e: anyhow::Error| NymAuthError::Unsatisfied(format!("{e:#}"));
+        // The error text is not forwarded: it is built from circuit state.
+        let unsat =
+            |_: anyhow::Error| NymAuthError::Unsatisfied("an in-circuit assertion failed".into());
         let hash_eval = self.l.hash.evaluate(h).map_err(unsat)?;
         let sig_eval = self.l.sig.evaluate(s).map_err(unsat)?;
         if !hash_eval.outputs().iter().all(|o| bool::from(o.is_zero())) {
@@ -581,7 +701,7 @@ impl NymAuthProver {
             msgs,
             pseudonym,
         } = self.build_inputs(&c, w)?;
-        let mut a_p = [G::ZERO; 6];
+        let mut a_p = Wiped::new(vec![G::ZERO; 6], G::ZERO);
         for a in a_p.iter_mut() {
             *a = G::sample();
         }
@@ -610,7 +730,8 @@ impl NymAuthProver {
         });
         let mut transcript = Transcript::new(c.seed, TranscriptMode::Normal)
             .map_err(|e| NymAuthError::Prover(e.to_string()))?;
-        let prov = |e: anyhow::Error| NymAuthError::Prover(format!("{e:#}"));
+        // The proving system's error text can contain witness values; it is not forwarded.
+        let prov = |_: anyhow::Error| NymAuthError::Prover("the proving system failed".into());
         let hash_state = self.hash_prover.commit(&hash_witness).map_err(prov)?;
         transcript
             .write_byte_array(hash_state.commitment().as_bytes())

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 //! Reader for the `LFC2` circuit serialization of Google's newer Rust runtime, converting it to
 //! the legacy `LFC1` byte layout that [`crate::circuit::Circuit`] decodes.
 //!
@@ -5,7 +7,7 @@
 //! stores each layer's terms as a dictionary of relative deltas with a token stream; the circuit
 //! they describe is the same object as in LFC1, so this module expands the terms and writes them
 //! out in LFC1 (three-byte sizes, delta-coded wire indices). The circuit id is carried over
-//! unchanged and is checked against the structure by [`super::load`].
+//! unchanged and is checked against the recomputed id by [`super::load`].
 //!
 //! The format is read from the reference implementation
 //! (`rust/core/proto/src/reader/lfc2.rs` of google/longfellow-zk) and hardened with the same
@@ -19,6 +21,9 @@ const MAX_DELTAS: usize = 20_000_000;
 const MAX_CONSTANTS: usize = 5_000_000;
 const MAX_LAYERS: usize = 10_000;
 const SIZE_LIMIT: usize = 1 << 24;
+/// Output budget for one converted circuit (each expanded term takes 12 bytes). The published
+/// circuits convert to about 3 MiB in total.
+const MAX_OUT_BYTES: usize = 32 << 20;
 
 fn bad(m: impl Into<String>) -> NymAuthError {
     NymAuthError::Circuit(format!("LFC2: {}", m.into()))
@@ -88,7 +93,7 @@ fn put_delta(out: &mut Vec<u8>, v: u32, prev: u32) -> Result<(), NymAuthError> {
 
 /// Converts the LFC2 circuit at the start of `input` to LFC1 bytes, returning them and the
 /// number of input bytes consumed.
-fn one(input: &[u8]) -> Result<(Vec<u8>, usize), NymAuthError> {
+pub(super) fn one(input: &[u8]) -> Result<(Vec<u8>, usize), NymAuthError> {
     if !input.starts_with(b"LFC2") {
         return Err(bad("missing LFC2 header"));
     }
@@ -163,6 +168,9 @@ fn one(input: &[u8]) -> Result<(Vec<u8>, usize), NymAuthError> {
         if nterms > MAX_TERMS || total_terms > MAX_TERMS {
             return Err(bad("too many terms"));
         }
+        if nterms.saturating_mul(12).saturating_add(out.len()) > MAX_OUT_BYTES {
+            return Err(bad("converted circuit exceeds the size limit"));
+        }
         put3(&mut out, logw)?;
         put3(&mut out, nw)?;
         put3(&mut out, nterms)?;
@@ -187,19 +195,22 @@ fn one(input: &[u8]) -> Result<(Vec<u8>, usize), NymAuthError> {
     Ok((out, r.p))
 }
 
-/// If `artifact` is an LFC2 pair (signature circuit, then hash circuit), the same pair as LFC1
-/// bytes; otherwise `artifact` unchanged (already the legacy layout, or not a circuit at all,
-/// which the caller's decode then refuses).
+/// Converts an LFC2 pair (signature circuit, then hash circuit) to LFC1 bytes. Exactly two
+/// circuits are read and nothing may follow them. Callers authenticate the artifact (length and
+/// SHA-256, see [`super::profile`]) before calling this; the limits here bound memory regardless.
 pub(super) fn to_legacy_pair(artifact: &[u8]) -> Result<Vec<u8>, NymAuthError> {
-    if !artifact.starts_with(b"LFC2") {
-        return Ok(artifact.to_vec());
-    }
     let mut out = Vec::new();
     let mut at = 0;
-    while at < artifact.len() {
+    for _ in 0..2 {
         let (bytes, used) = one(&artifact[at..])?;
+        if out.len() + bytes.len() > MAX_OUT_BYTES {
+            return Err(bad("converted circuits exceed the size limit"));
+        }
         out.extend_from_slice(&bytes);
         at += used;
+    }
+    if at != artifact.len() {
+        return Err(bad("bytes left over after the hash circuit"));
     }
     Ok(out)
 }

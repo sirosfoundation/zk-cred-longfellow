@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 //! A minimal, bounds-checked CBOR walker for the IssuerSigned structure. Only definite lengths
 //! are accepted, which is what the nym_auth issuance profile requires.
 
