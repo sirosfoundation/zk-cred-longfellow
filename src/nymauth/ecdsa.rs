@@ -235,8 +235,9 @@ pub(super) fn verification(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use wasm_bindgen_test::wasm_bindgen_test;
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn constants_are_well_formed() {
         for h in [P_HEX, N_HEX, B_HEX, GX_HEX, GY_HEX] {
             assert_eq!(hex::decode(h).unwrap().len(), 32);

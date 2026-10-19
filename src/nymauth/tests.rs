@@ -5,6 +5,7 @@
 use super::*;
 use crate::fields::{field2_128::Field2_128, fieldp256::FieldP256};
 use std::sync::OnceLock;
+use wasm_bindgen_test::wasm_bindgen_test;
 
 /// The fixture build's circuit ids (also the profile table's entry).
 pub(super) const MDOC_HASH_CIRCUIT_ID: &str =
@@ -197,7 +198,7 @@ fn proof() -> &'static NymAuthProof {
 // The witness against the archive's complete input vectors
 // ---------------------------------------------------------------------------------------------
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn witness_matches_the_archive_input_vectors() {
     let fx = Fx::load(0);
     let pr = prover();
@@ -241,7 +242,7 @@ fn witness_matches_the_archive_input_vectors() {
     assert_eq!((bad_h, bad_s), (0, 0));
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn archive_vectors_satisfy_both_circuits() {
     let pr = prover();
     let hw = zstd::decode_all(HASH_WITNESS_ZST).unwrap();
@@ -265,7 +266,7 @@ fn archive_vectors_satisfy_both_circuits() {
 // Cross-implementation: the archive's proof, made by Google's runtime
 // ---------------------------------------------------------------------------------------------
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn the_archive_proof_verifies() {
     let fx = Fx::load(0);
     verifier()
@@ -273,7 +274,7 @@ fn the_archive_proof_verifies() {
         .unwrap();
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn the_archive_proof_is_refused_for_another_verifier_or_pseudonym() {
     let fx = Fx::load(0);
     let other = Fx::load(1);
@@ -295,7 +296,7 @@ fn the_archive_proof_is_refused_for_another_verifier_or_pseudonym() {
 // Our own proofs
 // ---------------------------------------------------------------------------------------------
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn a_real_proof_verifies_and_reports_the_fixture_pseudonym() {
     let fx = Fx::load(0);
     let pf = proof();
@@ -311,7 +312,7 @@ fn a_real_proof_verifies_and_reports_the_fixture_pseudonym() {
         .unwrap();
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn the_second_verifier_gets_the_second_pseudonym() {
     let fx = Fx::load(1);
     let pf = prover().prove(&fx.request(), &fx.witness()).unwrap();
@@ -321,7 +322,7 @@ fn the_second_verifier_gets_the_second_pseudonym() {
         .unwrap();
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn proofs_are_randomized() {
     let fx = Fx::load(0);
     let a = proof();
@@ -330,7 +331,7 @@ fn proofs_are_randomized() {
     assert_eq!(a.pseudonym, b.pseudonym);
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn verification_refuses_tampered_proofs_and_requests() {
     let fx = Fx::load(0);
     let pf = proof();
@@ -477,7 +478,7 @@ fn unsatisfied(r: Result<NymAuthProof, NymAuthError>) {
     }
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn prover_refuses_a_wrong_seed() {
     let fx = Fx::load(0);
     let mut seed = fx.seed;
@@ -491,7 +492,7 @@ fn prover_refuses_a_wrong_seed() {
     ));
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn prover_refuses_a_wrong_issuer_key() {
     let fx = Fx::load(0);
     let gx = unhex("6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296");
@@ -506,7 +507,7 @@ fn prover_refuses_a_wrong_issuer_key() {
     ));
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn prover_refuses_a_wrong_device_signature_or_challenge() {
     let fx = Fx::load(0);
     let mut sig = fx.dev_sig;
@@ -529,7 +530,7 @@ fn prover_refuses_a_wrong_device_signature_or_challenge() {
     ));
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn prover_refuses_a_tampered_credential() {
     let fx = Fx::load(0);
     // Flip a byte inside the signed MSO: the issuer signature no longer verifies.
@@ -549,7 +550,7 @@ fn prover_refuses_a_tampered_credential() {
     ));
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn prover_refuses_a_request_the_credential_does_not_meet() {
     let fx = Fx::load(0);
     // Valid until 2036 or so, but not valid yet in 2000.
@@ -579,7 +580,7 @@ fn prover_refuses_a_request_the_credential_does_not_meet() {
     ));
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn malformed_inputs_are_typed_errors_not_panics() {
     let fx = Fx::load(0);
     let pr = prover();
@@ -666,7 +667,7 @@ fn malformed_inputs_are_typed_errors_not_panics() {
 // Circuit loading
 // ---------------------------------------------------------------------------------------------
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn circuit_ids_and_parameters_are_checked() {
     let c = circuit();
     let with = |f: &dyn Fn(&mut NymAuthCircuitParams)| {
@@ -705,7 +706,7 @@ fn circuit_ids_and_parameters_are_checked() {
     ));
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn circuit_id_of_the_artifact_is_the_published_one() {
     let l = load(&circuit(), &params()).unwrap();
     assert_eq!(
@@ -762,7 +763,7 @@ mod c_abi_tests {
         Some(s)
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn prove_and_verify_through_the_c_abi() {
         let fx = Fx::load(0);
         let circuit = circuit();
@@ -947,7 +948,7 @@ mod uniffi_tests {
         nymauth_initialize_prover, nymauth_initialize_verifier, nymauth_prove, nymauth_verify,
     };
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn prove_and_verify_through_the_uniffi_surface() {
         let fx = Fx::load(0);
         let params = || FfiParams {
@@ -998,7 +999,7 @@ mod uniffi_tests {
     }
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn wiped_buffers_are_zeroed_on_drop() {
     use std::mem::ManuallyDrop;
     let mut s = ManuallyDrop::new(wipe::SecretArray([0xa5u8; 16]));
@@ -1008,7 +1009,7 @@ fn wiped_buffers_are_zeroed_on_drop() {
 }
 
 /// `cargo test --release --lib nymauth::tests::measure -- --ignored --nocapture`
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 #[ignore = "timing only"]
 fn measure_load_prove_verify() {
     use std::time::Instant;
@@ -1036,7 +1037,7 @@ fn measure_load_prove_verify() {
 
 /// Writes a real proof for the reference verifier: `NYMAUTH_DUMP=/path cargo test --release
 /// --lib nymauth::tests::dump -- --ignored`.
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 #[ignore = "writes a file"]
 fn dump_proof_for_the_reference_verifier() {
     let fx = Fx::load(0);
@@ -1057,7 +1058,7 @@ mod challenge;
 
 /// Fixtures for the Go cgo smoke test (`go-cabi-smoketest/nymauth`):
 /// `cargo test --release --lib nymauth::tests::dump_go -- --ignored` (or `make go-cabi-nymauth-fixture`).
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 #[ignore = "writes files for the Go smoke test"]
 fn dump_go_smoke_fixture() {
     let fx = Fx::load(0);

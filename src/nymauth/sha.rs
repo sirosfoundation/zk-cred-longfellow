@@ -123,8 +123,9 @@ pub(super) fn sha256(m: &[u8]) -> [u8; 32] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use wasm_bindgen_test::wasm_bindgen_test;
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn face_chain_matches_sha2() {
         for len in [0usize, 3, 55, 56, 64, 119, 200] {
             let m: Vec<u8> = (0..len).map(|i| i as u8).collect();
@@ -141,7 +142,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn pad_refuses_oversized() {
         assert!(pad(&[0u8; 56], 1).is_none());
         assert!(pad(&[0u8; 55], 1).is_some());

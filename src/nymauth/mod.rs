@@ -28,7 +28,9 @@ mod lfc2;
 mod mdoc;
 mod profile;
 mod sha;
-#[cfg(test)]
+// The end-to-end tests make dozens of proofs; they run natively only. The unit tests inside the
+// other modules also run under wasm.
+#[cfg(all(test, not(target_family = "wasm")))]
 mod tests;
 mod wipe;
 

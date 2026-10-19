@@ -176,10 +176,11 @@ pub(super) fn for_hash_circuit(id: &str) -> Result<Profile, NymAuthError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use wasm_bindgen_test::wasm_bindgen_test;
 
     const HASH_ID: &str = "5f8c75ae5c3893ef6ab6a079628cb385ba85e95a85437d58570c455289d75729";
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn mdoc_profile_matches_the_archive() {
         let p = for_hash_circuit(HASH_ID).unwrap();
         assert_eq!((p.b_sig, p.b_item, p.b_ssc), (7, 2, 2));
@@ -202,7 +203,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn unknown_circuit_is_refused() {
         assert!(matches!(
             for_hash_circuit(&"0".repeat(64)),
@@ -210,7 +211,7 @@ mod tests {
         ));
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn every_entry_is_well_formed() {
         // Appending an entry must not need any other change: its table parses and tiles.
         for e in ENTRIES {

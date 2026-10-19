@@ -55,8 +55,9 @@ impl<const N: usize> Drop for SecretArray<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use wasm_bindgen_test::wasm_bindgen_test;
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn wipe_zeroes() {
         let mut v = vec![7u8; 33];
         wipe(&mut v, 0);

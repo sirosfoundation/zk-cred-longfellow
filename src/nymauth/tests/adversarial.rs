@@ -11,6 +11,7 @@ use crate::circuit::Evaluation;
 use crate::nymauth::{cbor, mdoc, sha};
 use num_bigint::BigUint;
 use std::time::Instant;
+use wasm_bindgen_test::wasm_bindgen_test;
 
 // ------------------------------------------------------------------------------------------
 // mini P-256 (affine, BigUint) so the harness can issue credentials under its own keys
@@ -300,7 +301,7 @@ fn msg_nym(dst: &[u8], seed: &[u8], z: &[u8], vi: &[u8]) -> Vec<u8> {
 // ------------------------------------------------------------------------------------------
 // T0 control: own-issuer credential proves and verifies (validates harness signing + trace)
 // ------------------------------------------------------------------------------------------
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn own_issuer_credential_end_to_end() {
     let fx = Fx::load(0);
     let env = env();
@@ -327,7 +328,7 @@ fn own_issuer_credential_end_to_end() {
 // T2 pseudonym / seed binding in the hash circuit (the sybil-resistance property): patch ONLY the
 // nym faces + public pseudonym; everything else (ssc commitment, credential) stays honest.
 // ------------------------------------------------------------------------------------------
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn pseudonym_is_bound_to_the_committed_seed() {
     let fx = Fx::load(0);
     let pr = prover();
@@ -425,7 +426,7 @@ fn pseudonym_is_bound_to_the_committed_seed() {
     );
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn cheating_prover_with_mismatched_messages_is_refused_by_verifier() {
     let fx = Fx::load(0);
     let env = env();
@@ -479,7 +480,7 @@ fn cheating_prover_with_mismatched_messages_is_refused_by_verifier() {
 // ------------------------------------------------------------------------------------------
 // T4 proof splicing / substitution across instances
 // ------------------------------------------------------------------------------------------
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn proof_splicing_is_refused() {
     let v = verifier();
     let (f0, f1) = (Fx::load(0), Fx::load(1));

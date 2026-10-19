@@ -4,6 +4,7 @@
 use super::*;
 use crate::nymauth::{challenge_digest, derive_challenge, verifier_input};
 use serde_json::Value as Json;
+use wasm_bindgen_test::wasm_bindgen_test;
 
 fn vectors() -> Json {
     serde_json::from_str(include_str!(
@@ -22,7 +23,7 @@ fn thumb(j: &Json) -> Option<Vec<u8>> {
         .map(|h| hex::decode(h).unwrap())
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn derive_matches_every_shared_vector() {
     let v = vectors();
     let all = v["derive"].as_array().unwrap();
@@ -54,7 +55,7 @@ fn derive_matches_every_shared_vector() {
     }
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn the_archive_fixture_challenge_is_what_the_fixture_signature_is_over() {
     // Verifier 1 and 2 of the fixtures: e2 and the transcript equal the ones the tests use.
     for (i, v) in [0usize, 1].into_iter().enumerate() {
@@ -76,7 +77,7 @@ fn the_archive_fixture_challenge_is_what_the_fixture_signature_is_over() {
     }
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn the_kotlin_fixture_transcript_gives_the_review_e2() {
     let v = vectors();
     let case = &v["digest"][0];
@@ -86,7 +87,7 @@ fn the_kotlin_fixture_transcript_gives_the_review_e2() {
     assert!(d.starts_with("205f2280") && d.ends_with("d1a0"));
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn every_shared_reject_vector_is_refused() {
     let v = vectors();
     let rejects = v["rejects"].as_array().unwrap();
@@ -123,7 +124,7 @@ fn every_shared_reject_vector_is_refused() {
     assert!(verifier_input("").is_err());
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn a_derived_challenge_proves_and_verifies() {
     // End to end: a verifier derives e2 and the seed itself from origin and nonce; the proof made
     // by the holder with those values verifies, and a different nonce does not.
@@ -174,7 +175,7 @@ mod c_abi {
         }
     }
 
-    #[test]
+    #[wasm_bindgen_test(unsupported = test)]
     fn challenge_helpers_through_the_c_abi() {
         let v = vectors();
         let case = &v["derive"][2]; // with a JWK thumbprint

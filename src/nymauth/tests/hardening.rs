@@ -2,6 +2,7 @@
 //! and secret handling. Each was checked non-vacuous by reverting the fix.
 
 use super::*;
+use wasm_bindgen_test::wasm_bindgen_test;
 
 fn uleb(mut v: u32, out: &mut Vec<u8>) {
     loop {
@@ -56,7 +57,7 @@ fn is_pin_error(e: &NymAuthError) -> bool {
 // CIRCUIT-1: the artifact is authenticated before anything is parsed or allocated
 // ---------------------------------------------------------------------------------------------
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn artifact_is_authenticated_before_it_is_parsed() {
     let genuine = circuit();
     let mut flipped = genuine.clone();
@@ -84,7 +85,7 @@ fn artifact_is_authenticated_before_it_is_parsed() {
     }
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn converter_output_is_bounded_whatever_the_caller_did() {
     // Defence in depth: even if an unauthenticated artifact reached the converter, it stops at
     // its output budget, and reads exactly two circuits.
@@ -104,7 +105,7 @@ fn converter_output_is_bounded_whatever_the_caller_did() {
 // CIRCUIT-2: the transcript binds the stored id, so it must equal the recomputed one
 // ---------------------------------------------------------------------------------------------
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn stored_circuit_id_must_equal_the_recomputed_id() {
     let genuine = circuit();
     let (sig_part, sig_used) = lfc2::one(&genuine).unwrap();
@@ -132,7 +133,7 @@ fn stored_circuit_id_must_equal_the_recomputed_id() {
 // CIRCUIT-3: Ligero widths and ids come from the profile, not the descriptor
 // ---------------------------------------------------------------------------------------------
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn descriptor_parameters_must_equal_the_profile() {
     let c = circuit();
     for (h, s) in [
@@ -155,7 +156,7 @@ fn descriptor_parameters_must_equal_the_profile() {
     }
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn an_unlisted_build_fails_closed_before_any_parsing() {
     // Unknown hash circuit id: refused as unsupported, with any artifact at all.
     for artifact in [
@@ -187,7 +188,7 @@ fn an_unlisted_build_fails_closed_before_any_parsing() {
 // CIRCUIT-4 / CIRCUIT-5: request validation, at prove and at verify
 // ---------------------------------------------------------------------------------------------
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn transcript_seed_length_is_bounded() {
     let fx = Fx::load(0);
     let long = vec![7u8; 65_537];
@@ -222,7 +223,7 @@ fn transcript_seed_length_is_bounded() {
     ));
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn time_and_dates_must_be_calendar_valid_digits() {
     let fx = Fx::load(0);
     let bad_times = [
@@ -323,7 +324,7 @@ fn time_and_dates_must_be_calendar_valid_digits() {
 // CIRCUIT-6: secrets in Debug output and error strings; wiping of the extra buffers
 // ---------------------------------------------------------------------------------------------
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn debug_output_is_redacted() {
     let fx = Fx::load(0);
     let w = format!("{:?}", fx.witness());
@@ -336,7 +337,7 @@ fn debug_output_is_redacted() {
 }
 
 #[cfg(feature = "uniffi")]
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn uniffi_records_are_redacted_in_debug() {
     use crate::nymauth::ffi_uniffi::{NymAuthProveRequest, NymAuthProveResponse};
     let r = NymAuthProveRequest {
@@ -364,7 +365,7 @@ fn uniffi_records_are_redacted_in_debug() {
     assert!(d.contains("redacted") && !d.contains("205") && !d.contains("cd"));
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn refusals_do_not_leak_circuit_state() {
     let fx = Fx::load(0);
     let mut seed = fx.seed;
@@ -385,7 +386,7 @@ fn refusals_do_not_leak_circuit_state() {
     );
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn parsed_credential_is_wiped_on_drop() {
     use std::mem::ManuallyDrop;
     let mut p = ManuallyDrop::new(mdoc::Parsed {
@@ -400,7 +401,7 @@ fn parsed_credential_is_wiped_on_drop() {
     assert!(p.issuer_sig.iter().chain(&p.x).chain(&p.y).all(|&b| b == 0));
 }
 
-#[test]
+#[wasm_bindgen_test(unsupported = test)]
 fn the_fuzz_seed_proof_is_a_valid_proof() {
     // `fuzz/seeds/nymauth/proof-seed` is 0x01 followed by the archive's proof; the fuzz target
     // verifies it against the fixture request, so it must keep verifying.
