@@ -27,3 +27,10 @@ cargo run \
     --language <LANGUAGE>
     --out-dir out
 ```
+
+## nym_auth prover
+
+`zk_cred_longfellow::nymauth` proves and verifies the `longfellow-nymauth` mdoc circuits (age range,
+validity, issuer and device signatures, and the verifier-specific pseudonym). It is separate from the
+generic mdoc entry points. See [`docs/NYMAUTH.md`](docs/NYMAUTH.md); the C header is
+`include/zk_cred_longfellow_nymauth.h` and the UniFFI functions are `nymauth_*`.

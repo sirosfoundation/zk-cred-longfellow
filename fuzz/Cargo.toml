@@ -29,3 +29,10 @@ path = "fuzz_targets/mdoc_zk_proof.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "nymauth"
+path = "fuzz_targets/nymauth.rs"
+test = false
+doc = false
+bench = false

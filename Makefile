@@ -84,7 +84,7 @@ $(BUILD_DIR)/release/$(LIB_NAME).$(HOST_LIB_EXT):
 # (no `--features uniffi`): the go_ffi module is always compiled in, and
 # building without uniffi keeps this artifact free of UniFFI's scaffolding
 # and its extra dependency graph, which Go/cgo callers have no use for.
-go-cabi: $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) $(GO_CABI_DIR)/$(LIB_NAME).a $(GO_CABI_DIR)/zk_cred_longfellow_go.h
+go-cabi: $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) $(GO_CABI_DIR)/$(LIB_NAME).a $(GO_CABI_DIR)/zk_cred_longfellow_go.h $(GO_CABI_DIR)/zk_cred_longfellow_nymauth.h
 	@echo "Go C-ABI library + header staged in $(GO_CABI_DIR)"
 
 $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT): $(GO_CABI_DIR)/zk_cred_longfellow_go.h
@@ -100,6 +100,10 @@ $(GO_CABI_DIR)/$(LIB_NAME).a: $(GO_CABI_DIR)/zk_cred_longfellow_go.h
 $(GO_CABI_DIR)/zk_cred_longfellow_go.h: include/zk_cred_longfellow_go.h
 	@mkdir -p $(GO_CABI_DIR)
 	cp include/zk_cred_longfellow_go.h $(GO_CABI_DIR)/
+
+$(GO_CABI_DIR)/zk_cred_longfellow_nymauth.h: include/zk_cred_longfellow_nymauth.h
+	@mkdir -p $(GO_CABI_DIR)
+	cp include/zk_cred_longfellow_nymauth.h $(GO_CABI_DIR)/
 
 # ── iOS cross-compilation (must run on macOS with Xcode toolchains) ─
 
