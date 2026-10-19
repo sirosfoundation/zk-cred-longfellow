@@ -147,8 +147,10 @@ vectors and its proof).
 
 ## Provenance and licence
 
-The circuits, slot map, credential, verifier request, witnesses and proof under `src/nymauth/profiles/`
-and `test-vectors/nymauth/` come from the SIROS `nym-auth-circuits` archive (owned by SIROS; no
-third-party licence applies to them). `src/nymauth/lfc2.rs` implements the LFC2 format following
-the reader in google/longfellow-zk (`rust/core/proto`, Apache-2.0). New source files carry
-`SPDX-License-Identifier: MPL-2.0`, the licence of this repository.
+The repository is a fork of ISRG's zk-cred-longfellow and stays under its licence (MPL-2.0, `LICENSE`);
+see `NOTICE`. The nym_auth module is written by SIROS and contributed under that licence. The
+circuits, slot map, credential, verifier request, witnesses and proof under `src/nymauth/profiles/`
+and `test-vectors/nymauth/` are SIROS-owned (from the `nym-auth-circuits` archive) and distributed
+here under the same licence. `src/nymauth/lfc2.rs` is derived in part from Google's longfellow-zk
+Rust runtime (Apache-2.0, Copyright 2026 Google LLC): the file header keeps the notice and states
+the modifications, and `NOTICE` and `third_party/google-longfellow-zk/LICENSE` carry the rest.

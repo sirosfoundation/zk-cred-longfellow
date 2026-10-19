@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * zk_cred_longfellow_nymauth.h - hand-written C header for the nym_auth
  * prover and verifier of zk-cred-longfellow.

@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 //! The verifier's challenge, derived exactly as `SPEC.md` section 3 defines it:
 //!
 //! ```text

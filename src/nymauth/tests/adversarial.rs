@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 //! Adversarial tests from the independent review of PR #13 (harness by the reviewer): a cheating
 //! prover that skips the satisfiability gates, pseudonym/seed binding in the hash circuit, and
 //! proof splicing. The harness issues credentials under its own issuer and device keys with a

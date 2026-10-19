@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 //! UniFFI surface of the nym_auth prover and verifier (Kotlin and Swift), separate from the
 //! generic mdoc entry points in [`crate::ffi_api`].
 //!

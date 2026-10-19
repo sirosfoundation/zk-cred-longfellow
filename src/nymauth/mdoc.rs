@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 //! The hash circuit's semantic bits S for an mdoc nym_auth credential (SPEC.md L4.2).
 
 use super::{

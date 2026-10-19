@@ -1,4 +1,24 @@
-// SPDX-License-Identifier: MPL-2.0
+// Copyright 2026 Google LLC.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// This file is derived in part from google/longfellow-zk (commit 61a8a73),
+// rust/core/proto/src/reader/lfc2.rs, writer/lfc1.rs and uleb.rs. It has been MODIFIED: the
+// reader is ported to this crate's error type and writes the LFC1 byte layout this crate's
+// `Circuit` decodes, with a tighter output budget and an exact two-circuit rule; the ULEB128
+// helper is reimplemented. A copy of the Apache-2.0 licence is in
+// third_party/google-longfellow-zk/LICENSE and the attribution is repeated in NOTICE. The
+// modifications are part of this repository, which is licensed under MPL-2.0 (see LICENSE).
 
 //! Reader for the `LFC2` circuit serialization of Google's newer Rust runtime, converting it to
 //! the legacy `LFC1` byte layout that [`crate::circuit::Circuit`] decodes.

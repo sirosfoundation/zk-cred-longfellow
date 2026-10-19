@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 // Command nymauth is a real cgo program that links against zk-cred-longfellow's plain C ABI
 // (see `make go-cabi`, `src/nymauth/c_abi.rs` and `include/zk_cred_longfellow_nymauth.h`) and
 // drives the nym_auth verifier the way a Go verifier service would: load the circuit and

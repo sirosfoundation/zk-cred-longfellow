@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 //! Regression tests for the review findings on artifact loading, parameters, request validation
 //! and secret handling. Each was checked non-vacuous by reverting the fix.
 

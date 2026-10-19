@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 //! The allowlist of nym_auth circuit builds, and what the prover trusts about each.
 //!
 //! Nothing about a circuit is taken from the catalog descriptor or from the artifact itself. A

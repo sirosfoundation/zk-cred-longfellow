@@ -56,8 +56,20 @@ fails closed: an unlisted hash circuit id is `UnsupportedCircuit` before the art
 a listed id with any other artifact length or SHA-256, signature circuit id, `block_enc`, stored id
 or input count is refused as `Circuit`. No handle is returned.
 
-## Provenance
+## Provenance and licence
 
-`test-vectors/nymauth/` and `src/nymauth/profiles/` are copied from the SIROS `nym-auth-circuits`
-archive (SIROS-owned). `src/nymauth/lfc2.rs` follows the LFC2 reader of google/longfellow-zk
-(Apache-2.0). New files are MPL-2.0 (`SPDX-License-Identifier`).
+This repository is a fork of [abetterinternet/zk-cred-longfellow](https://github.com/abetterinternet/zk-cred-longfellow)
+(Copyright 2025 ISRG) and stays under its licence, MPL-2.0 (see `LICENSE`); nothing here is
+relicensed. Details are in `NOTICE`.
+
+- The nym_auth module (`src/nymauth/`), its bindings, tests and docs are written by SIROS and
+  contributed under the repository's licence (MPL-2.0). Like the upstream files, they carry no
+  per-file header; the notice in `LICENSE` applies.
+- `src/nymauth/lfc2.rs` is derived in part from Google's longfellow-zk Rust runtime
+  (Apache-2.0, Copyright 2026 Google LLC). Its header keeps the Apache-2.0 notice and states the
+  modifications; the licence text is in `third_party/google-longfellow-zk/LICENSE`.
+- `test-vectors/nymauth/` and `src/nymauth/profiles/` (circuits, witnesses, credential, verifier
+  request, proof, slot map) come from the SIROS nym-auth-circuits archive. SIROS owns them and
+  distributes them here under the repository's licence.
+- The files edited from upstream (`src/lib.rs`, `src/circuit.rs`, `Makefile`, `README.md`,
+  `fuzz/Cargo.toml`) keep their existing content; only additions were made.

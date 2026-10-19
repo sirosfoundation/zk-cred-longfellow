@@ -111,8 +111,8 @@ deterministically. Just set the `seed` variable in test functions
 
 ## nym_auth (`nymauth/`)
 
-Vectors for `src/nymauth/`, copied from the SIROS `nym-auth-circuits` archive (SIROS-owned) unless
-noted:
+Vectors for `src/nymauth/`, copied from the SIROS `nym-auth-circuits` archive. SIROS owns them and
+distributes them here under this repository's licence (MPL-2.0), unless noted:
 
 - `mdoc-circuits.zst`: the signature and hash circuits (LFC2), one zstd frame
   (`longfellow/mdoc/circuits.zst` of the archive).

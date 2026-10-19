@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 //! The signature circuit's 1,037 values for one ECDSA verification, D(Q, d, r, s)
 //! (SPEC.md section L5).
 

@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 //! The shared challenge vectors (`test-vectors/nymauth/challenge-vectors.json`, byte-identical in
 //! zk-cred-vega and zk-cred-longfellow): e2 and the transcript seed per `SPEC.md` section 3.
 

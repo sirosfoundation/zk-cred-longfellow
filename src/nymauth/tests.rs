@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 //! End-to-end tests over the credential fixtures of the `nym-auth-circuits` archive (copied to
 //! `test-vectors/nymauth/`): the witness against the archive's complete input vectors, the
 //! archive's own proof, and real proofs made and checked here.

@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 //! The `nymauth` prover and verifier: the two-circuit Longfellow proof for the nym_auth mdoc
 //! circuits of the `nym-auth-circuits` archive (SPEC.md sections L3 to L6).
 //!

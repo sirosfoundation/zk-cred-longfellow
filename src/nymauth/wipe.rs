@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 //! Best-effort zeroing of secret-bearing buffers.
 
 use std::ops::{Deref, DerefMut};

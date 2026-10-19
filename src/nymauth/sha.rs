@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 //! SHA-256 compression with the per-block "face" the nym_auth hash circuit consumes
 //! (SPEC.md section L4.1).
 

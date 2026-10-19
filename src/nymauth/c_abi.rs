@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MPL-2.0
-
 //! Plain C ABI of the nym_auth prover and verifier, for cgo and other C callers.
 //!
 //! Same conventions as [`crate::go_ffi`]: opaque handles created with `Box::into_raw`, plain
