@@ -431,6 +431,10 @@ fn every_credential_buffer_is_wiped_when_the_witness_builder_returns() {
         ("padded seed, 1 block", 64),
         ("padded nym message, 2 blocks", 2 * 64),
         ("nym message", 119),
+        (
+            "SHA-256 schedule and round traces: 14 blocks x 3 arrays x 256 B",
+            14 * 3 * 256,
+        ),
         ("semantic bits S", 96_440),
         ("issuer signature", 64),
         ("device key x and y", 64),
@@ -440,4 +444,34 @@ fn every_credential_buffer_is_wiped_when_the_witness_builder_returns() {
         wiped, total,
         "bytes wiped vs. the buffers listed: {expected:?}"
     );
+}
+
+#[cfg(feature = "uniffi")]
+#[wasm_bindgen_test(unsupported = test)]
+fn the_uniffi_record_buffers_are_wiped() {
+    // review finding: only the seed of the lifted record was wiped. A request refused by
+    // validation reaches no other wipe, so the counter shows exactly the record's three buffers.
+    use crate::nymauth::ffi_uniffi::{NymAuthProveRequest, nymauth_prove};
+    let fx = Fx::load(0);
+    let request = NymAuthProveRequest {
+        issuer_signed: fx.credential.clone(),
+        secret_seed: fx.seed.to_vec(),
+        issuer_key_x: fx.qx.clone(),
+        issuer_key_y: fx.qy.clone(),
+        time: "not a time".into(),
+        earliest: fx.earliest.clone(),
+        cutoff: fx.cutoff.clone(),
+        challenge_digest: fx.e2.to_vec(),
+        device_signature: fx.dev_sig.to_vec(),
+        verifier_input: fx.vi.to_vec(),
+        transcript_seed: fx.transcript.clone(),
+    };
+    let expected = fx.credential.len() + 16 + 64;
+    let before = wipe::WIPED_BYTES.with(|c| c.get());
+    assert!(matches!(
+        nymauth_prove(prover(), request),
+        Err(NymAuthError::InvalidInput(_))
+    ));
+    let wiped = wipe::WIPED_BYTES.with(|c| c.get()) - before;
+    assert_eq!(wiped, expected);
 }

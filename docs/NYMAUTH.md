@@ -133,7 +133,9 @@ vectors and its proof).
   hashing, the signed-message, birth_date and ssc item copies and their padded blocks, the semantic bits, the input vectors, the device signature and its r and s, the device key,
   the signed message and its digest, the issuer signature and the MAC key shares a_p are zeroed on
   every exit path. What is not wiped, because it is outside this module's control: the witness,
-  tableau and evaluation copies inside the proving system (private fields upstream), the transient
+  tableau and evaluation copies inside the proving system (private fields upstream), the SHA-256
+  working variables (registers and stack slots the compiler owns; the schedule and round-trace arrays
+  are wiped), the transient
   field-element and `BigUint` values of the ECDSA arithmetic, and compiler spills. Error text from
   the proving system and from circuit evaluation is never forwarded (it can carry wire values);
   `Debug` of the proof, witness input and the UniFFI records prints sizes only.

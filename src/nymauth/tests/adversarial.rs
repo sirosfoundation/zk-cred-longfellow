@@ -640,3 +640,38 @@ fn prove_unchecked(
         Err(_) => Err("PANIC".into()),
     }
 }
+
+// ------------------------------------------------------------------------------------------
+// A digest at or above the group order n: the circuits take the digest bits unreduced and the
+// ladder uses the reduced value (SPEC.md L5 step 1). A device signature over such a digest (the
+// challenge digest e2 is verifier-chosen, so any 256-bit value can occur) must prove and verify.
+// ------------------------------------------------------------------------------------------
+#[wasm_bindgen_test(unsupported = test)]
+fn digests_at_or_above_the_group_order_prove_and_verify() {
+    let fx = Fx::load(0);
+    let env = env();
+    let n = ec().n;
+    for (name, d) in [
+        ("n", n.clone()),
+        ("n + 1", &n + 1u8),
+        ("2^256 - 1", (BigUint::from(1u8) << 256) - 1u8),
+    ] {
+        let e2 = be32(&d);
+        let v = variant(&fx, &env, &|_| {});
+        let dev_sig = sign(&env.dev_d, &e2);
+        let rq = NymAuthRequest {
+            challenge_digest: &e2,
+            ..req(&fx, &env)
+        };
+        let w = NymAuthWitnessInput {
+            device_signature: &dev_sig,
+            ..wit(&fx, &v)
+        };
+        let pf = prover()
+            .prove(&rq, &w)
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
+        verifier()
+            .verify(&rq, &pf.pseudonym, &pf.proof)
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
+    }
+}

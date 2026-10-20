@@ -82,6 +82,12 @@ pub(super) fn compress(state: &mut [u32; 8], block: &[u8], face: Option<&mut Vec
             word(out, u64::from(*x), 32);
         }
     }
+    // The first schedule words are the message block itself, which can be the seed: wipe the
+    // schedule and the round traces. (The working variables a..h are registers or stack slots
+    // the compiler owns; that residue is documented.)
+    super::wipe::wipe(&mut w, 0);
+    super::wipe::wipe(&mut es, 0);
+    super::wipe::wipe(&mut as_, 0);
 }
 
 /// SHA-256 padding of `m`, then zero bytes up to `64 * blocks` bytes. `None` if `m` does not fit.

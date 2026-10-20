@@ -22,8 +22,11 @@ LIB_NAME   := lib$(CRATE_NAME)
 UNAME_S    := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
   HOST_LIB_EXT := dylib
+  # Mach-O exports carry a leading underscore; BSD nm lists them with -gU.
+  NM_EXPORTS   := nm -gU
 else
   HOST_LIB_EXT := so
+  NM_EXPORTS   := nm -D --defined-only
 endif
 VERSION    := $(shell cargo metadata --no-deps --format-version 1 | python3 -c "import sys,json; print(json.load(sys.stdin)['packages'][0]['version'])")
 
@@ -115,10 +118,10 @@ go-cabi-nymauth-fixture:
 
 # Fails clearly if the staged library lacks the nymauth entry points (a stale build).
 go-cabi-nymauth-check-symbols: go-cabi
-	@nm -D --defined-only $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) | grep -q ' T nymauth_verifier_new$$' \
-		|| { echo "ERROR: $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) has no nymauth_* symbols (stale library?); run 'make clean go-cabi'"; exit 1; }
-	@nm -D --defined-only $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) | grep -q ' T nymauth_prove$$' \
-		|| { echo "ERROR: nymauth_prove missing from the staged library"; exit 1; }
+	@for sym in nymauth_verifier_new nymauth_prove; do \
+		$(NM_EXPORTS) $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) | grep -Eq " T _?$$sym$$" \
+		|| { echo "ERROR: $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) lacks $$sym (stale library?); run 'make clean go-cabi'"; exit 1; }; \
+	done
 
 go-cabi-nymauth-smoke: go-cabi go-cabi-nymauth-check-symbols go-cabi-nymauth-fixture
 	cd go-cabi-smoketest && GOWORK=off LD_LIBRARY_PATH=../$(GO_CABI_DIR) go run ./nymauth

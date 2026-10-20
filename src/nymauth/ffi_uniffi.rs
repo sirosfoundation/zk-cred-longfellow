@@ -112,8 +112,11 @@ pub fn nymauth_prove(
             device_signature: &request.device_signature,
         },
     );
-    // The record owns the lifted seed bytes; zero them on every path.
+    // The record owns lifted copies of the seed, the credential and the device signature; zero
+    // them on every path.
     wipe::wipe(&mut request.secret_seed, 0);
+    wipe::wipe(&mut request.issuer_signed, 0);
+    wipe::wipe(&mut request.device_signature, 0);
     r.map(|p| NymAuthProveResponse {
         proof: p.proof,
         pseudonym: p.pseudonym.to_vec(),
