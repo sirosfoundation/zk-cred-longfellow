@@ -37,9 +37,9 @@ SWIFT_DIR      := $(BINDINGS_DIR)/swift
 KOTLIN_DIR     := $(BINDINGS_DIR)/kotlin
 XCFRAMEWORK    := $(BUILD_DIR)/$(CRATE_NAME).xcframework
 GO_CABI_DIR    := $(BUILD_DIR)/go-cabi
-# Everything the staged C-ABI libraries are built from: a stale library (built before a source
+# Everything the staged C-ABI libraries are built from (including the embedded slot maps): a stale library (built before a source
 # or Cargo change) is rebuilt, not just re-headed.
-RUST_SOURCES   := $(shell find src -name '*.rs') Cargo.toml Cargo.lock
+RUST_SOURCES   := $(shell find src \( -name '*.rs' -o -name '*.tsv' \)) Cargo.toml Cargo.lock
 
 # iOS targets
 IOS_TARGETS      := aarch64-apple-ios
@@ -124,7 +124,7 @@ go-cabi-nymauth-check-symbols: go-cabi
 	done
 
 go-cabi-nymauth-smoke: go-cabi go-cabi-nymauth-check-symbols go-cabi-nymauth-fixture
-	cd go-cabi-smoketest && GOWORK=off LD_LIBRARY_PATH=../$(GO_CABI_DIR) go run ./nymauth
+	cd go-cabi-smoketest && GOWORK=off LD_LIBRARY_PATH=../$(GO_CABI_DIR) DYLD_LIBRARY_PATH=../$(GO_CABI_DIR) go run ./nymauth
 
 # ── iOS cross-compilation (must run on macOS with Xcode toolchains) ─
 
