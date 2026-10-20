@@ -586,6 +586,20 @@ fn cbor_walker_refuses_malformed_items() {
             .to_string()
             .contains("z is missing")
     );
+    // text strings must be UTF-8; the long form of a simple value below 32 is not well-formed
+    assert!(
+        cbor::end(&[0x61, 0xff], 0)
+            .unwrap_err()
+            .to_string()
+            .contains("UTF-8")
+    );
+    assert_eq!(cbor::end(&[0x62, 0xc3, 0xa9], 0).unwrap(), 3);
+    for bad in [[0xf8u8, 0x00], [0xf8, 0x18], [0xf8, 0x1f]] {
+        let e = cbor::end(&bad, 0).unwrap_err().to_string();
+        assert!(e.contains("non-canonical"), "{bad:?}: {e}");
+    }
+    assert_eq!(cbor::end(&[0xf8, 0x20], 0).unwrap(), 2);
+    assert_eq!(cbor::end(&[0xf6], 0).unwrap(), 1);
     // truncation and indefinite lengths
     assert!(cbor::head(&[], 0).is_err());
     assert!(cbor::head(&[0x19, 0x01], 0).is_err());

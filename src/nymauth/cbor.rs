@@ -35,11 +35,29 @@ fn end_depth(d: &[u8], p: usize, depth: usize) -> R<usize> {
     }
     let (mt, v, hl) = head(d, p)?;
     let e = match mt {
-        2 | 3 => p
-            .checked_add(hl)
-            .and_then(|x| x.checked_add(usize::try_from(v).ok()?))
-            .ok_or_else(|| credential("CBOR length overflow"))?,
-        0 | 1 | 7 => p + hl,
+        2 | 3 => {
+            let e = p
+                .checked_add(hl)
+                .and_then(|x| x.checked_add(usize::try_from(v).ok()?))
+                .ok_or_else(|| credential("CBOR length overflow"))?;
+            // A text string must be valid UTF-8 (RFC 8949 section 3.1).
+            if mt == 3
+                && let Some(text) = d.get(p + hl..e)
+                && std::str::from_utf8(text).is_err()
+            {
+                return Err(credential("CBOR text string is not valid UTF-8"));
+            }
+            e
+        }
+        0 | 1 => p + hl,
+        7 => {
+            // The one-byte simple value form (additional info 24) is only well-formed for values
+            // 32 to 255; 0 to 31 must use the short form (RFC 8949 section 3.3).
+            if hl == 2 && v < 32 {
+                return Err(credential("non-canonical CBOR simple value"));
+            }
+            p + hl
+        }
         6 => end_depth(d, p + hl, depth + 1)?,
         4 | 5 => {
             let count = if mt == 5 { v.checked_mul(2) } else { Some(v) }
