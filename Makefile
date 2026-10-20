@@ -22,8 +22,11 @@ LIB_NAME   := lib$(CRATE_NAME)
 UNAME_S    := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
   HOST_LIB_EXT := dylib
+  # Mach-O exports carry a leading underscore; BSD nm lists them with -gU.
+  NM_EXPORTS   := nm -gU
 else
   HOST_LIB_EXT := so
+  NM_EXPORTS   := nm -D --defined-only
 endif
 VERSION    := $(shell cargo metadata --no-deps --format-version 1 | python3 -c "import sys,json; print(json.load(sys.stdin)['packages'][0]['version'])")
 
@@ -34,6 +37,9 @@ SWIFT_DIR      := $(BINDINGS_DIR)/swift
 KOTLIN_DIR     := $(BINDINGS_DIR)/kotlin
 XCFRAMEWORK    := $(BUILD_DIR)/$(CRATE_NAME).xcframework
 GO_CABI_DIR    := $(BUILD_DIR)/go-cabi
+# Everything the staged C-ABI libraries are built from (including the embedded slot maps): a stale library (built before a source
+# or Cargo change) is rebuilt, not just re-headed.
+RUST_SOURCES   := $(shell find src \( -name '*.rs' -o -name '*.tsv' \)) Cargo.toml Cargo.lock
 
 # iOS targets
 IOS_TARGETS      := aarch64-apple-ios
@@ -45,7 +51,7 @@ export IPHONEOS_DEPLOYMENT_TARGET ?= 16.0
 # Android targets (via cargo-ndk)
 ANDROID_TARGETS := aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
 
-.PHONY: all bindings bindings-swift bindings-kotlin ios android xcframework aar pom publish-local clean check-bindings go-cabi
+.PHONY: go-cabi-nymauth-fixture go-cabi-nymauth-smoke go-cabi-nymauth-check-symbols all bindings bindings-swift bindings-kotlin ios android xcframework aar pom publish-local clean check-bindings go-cabi
 
 all: bindings
 
@@ -84,15 +90,15 @@ $(BUILD_DIR)/release/$(LIB_NAME).$(HOST_LIB_EXT):
 # (no `--features uniffi`): the go_ffi module is always compiled in, and
 # building without uniffi keeps this artifact free of UniFFI's scaffolding
 # and its extra dependency graph, which Go/cgo callers have no use for.
-go-cabi: $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) $(GO_CABI_DIR)/$(LIB_NAME).a $(GO_CABI_DIR)/zk_cred_longfellow_go.h
+go-cabi: $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) $(GO_CABI_DIR)/$(LIB_NAME).a $(GO_CABI_DIR)/zk_cred_longfellow_go.h $(GO_CABI_DIR)/zk_cred_longfellow_nymauth.h
 	@echo "Go C-ABI library + header staged in $(GO_CABI_DIR)"
 
-$(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT): $(GO_CABI_DIR)/zk_cred_longfellow_go.h
+$(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT): $(GO_CABI_DIR)/zk_cred_longfellow_go.h $(GO_CABI_DIR)/zk_cred_longfellow_nymauth.h $(RUST_SOURCES)
 	cargo build --release
 	@mkdir -p $(GO_CABI_DIR)
 	cp $(BUILD_DIR)/release/$(LIB_NAME).$(HOST_LIB_EXT) $(GO_CABI_DIR)/
 
-$(GO_CABI_DIR)/$(LIB_NAME).a: $(GO_CABI_DIR)/zk_cred_longfellow_go.h
+$(GO_CABI_DIR)/$(LIB_NAME).a: $(GO_CABI_DIR)/zk_cred_longfellow_go.h $(GO_CABI_DIR)/zk_cred_longfellow_nymauth.h $(RUST_SOURCES)
 	cargo build --release
 	@mkdir -p $(GO_CABI_DIR)
 	cp $(BUILD_DIR)/release/$(LIB_NAME).a $(GO_CABI_DIR)/
@@ -100,6 +106,25 @@ $(GO_CABI_DIR)/$(LIB_NAME).a: $(GO_CABI_DIR)/zk_cred_longfellow_go.h
 $(GO_CABI_DIR)/zk_cred_longfellow_go.h: include/zk_cred_longfellow_go.h
 	@mkdir -p $(GO_CABI_DIR)
 	cp include/zk_cred_longfellow_go.h $(GO_CABI_DIR)/
+
+$(GO_CABI_DIR)/zk_cred_longfellow_nymauth.h: include/zk_cred_longfellow_nymauth.h
+	@mkdir -p $(GO_CABI_DIR)
+	cp include/zk_cred_longfellow_nymauth.h $(GO_CABI_DIR)/
+
+# Go smoke test of the nym_auth verifier through the C ABI (needs `make go-cabi` first):
+# writes a real proof and the request values, then runs a cgo program against them.
+go-cabi-nymauth-fixture:
+	cargo test --release --lib nymauth::tests::dump_go_smoke_fixture -- --ignored
+
+# Fails clearly if the staged library lacks the nymauth entry points (a stale build).
+go-cabi-nymauth-check-symbols: go-cabi
+	@for sym in nymauth_verifier_new nymauth_prove; do \
+		$(NM_EXPORTS) $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) | grep -Eq " T _?$$sym$$" \
+		|| { echo "ERROR: $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) lacks $$sym (stale library?); run 'make clean go-cabi'"; exit 1; }; \
+	done
+
+go-cabi-nymauth-smoke: go-cabi go-cabi-nymauth-check-symbols go-cabi-nymauth-fixture
+	cd go-cabi-smoketest && GOWORK=off LD_LIBRARY_PATH=../$(GO_CABI_DIR) DYLD_LIBRARY_PATH=../$(GO_CABI_DIR) go run ./nymauth
 
 # ── iOS cross-compilation (must run on macOS with Xcode toolchains) ─
 

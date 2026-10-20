@@ -1,0 +1,32 @@
+This repository is licensed under the Mozilla Public License 2.0 (see LICENSE). It is a fork of
+https://github.com/abetterinternet/zk-cred-longfellow (Copyright 2025 ISRG); everything that comes
+from that project stays under its licence and copyright, unchanged.
+
+Third-party material carried in the nym_auth module
+---------------------------------------------------
+
+src/nymauth/lfc2.rs is derived in part from the Rust runtime of Google's longfellow-zk,
+https://github.com/google/longfellow-zk at commit 61a8a735964d1b22bccf79bf14ef6767249cdf92:
+
+  rust/core/proto/src/reader/lfc2.rs   (the LFC2 circuit reader and its hardening limits)
+  rust/core/proto/src/writer/lfc1.rs   (the LFC1 layout it is converted to)
+  rust/core/proto/src/uleb.rs          (ULEB128 reading)
+
+  Copyright 2026 Google LLC. Licensed under the Apache License, Version 2.0. A copy of the
+  licence is in third_party/google-longfellow-zk/LICENSE. The upstream repository has no NOTICE
+  file. Modified: ported to this crate's types and error handling, reads into the LFC1 byte
+  layout instead of Google's circuit type, with a tighter output budget and an exact two-circuit
+  rule. The file keeps the Apache-2.0 notice in its header; Apache-2.0 material in a file covered
+  by MPL-2.0 is permitted with these notices kept.
+
+Not derived from Google code, but built to interoperate with it: the nym_auth witness builder,
+prover and verifier are written against this crate's own primitives following the SIROS
+nym-auth-circuits specification (SPEC.md L3 to L6) and its reference implementation, both
+authored by SIROS.
+
+SIROS-supplied data
+-------------------
+
+src/nymauth/profiles/ and test-vectors/nymauth/ (circuits, witnesses, credential, verifier request,
+proof, slot map) come from the SIROS nym-auth-circuits archive. SIROS owns them and distributes
+them here under this repository's licence (MPL-2.0).
