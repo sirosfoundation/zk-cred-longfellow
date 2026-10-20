@@ -521,3 +521,39 @@ pub unsafe extern "C" fn nymauth_verifier_input(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    #[wasm_bindgen_test(unsupported = test)]
+    fn every_error_has_its_own_status() {
+        let all = [
+            (NymAuthError::InvalidInput(String::new()), -1),
+            (NymAuthError::Circuit(String::new()), -2),
+            (NymAuthError::UnsupportedCircuit(String::new()), -3),
+            (NymAuthError::Credential(String::new()), -4),
+            (NymAuthError::Unsatisfied(String::new()), -5),
+            (NymAuthError::Prover(String::new()), -6),
+            (NymAuthError::Verification(String::new()), -7),
+        ];
+        for (e, code) in all {
+            assert_eq!(status(&e), code, "{e}");
+        }
+    }
+
+    #[wasm_bindgen_test(unsupported = test)]
+    #[cfg(not(target_family = "wasm"))]
+    fn a_panic_becomes_status_minus_100() {
+        let r = run::<()>(|| panic!("boom"));
+        assert_eq!(
+            r.unwrap_err(),
+            (-100, "nymauth: internal panic".to_string())
+        );
+        // errors keep their status and text; success passes through
+        let r = run::<()>(|| Err(NymAuthError::Credential("c".into())));
+        assert_eq!(r.unwrap_err().0, -4);
+        assert_eq!(run(|| Ok(7)).unwrap(), 7);
+    }
+}

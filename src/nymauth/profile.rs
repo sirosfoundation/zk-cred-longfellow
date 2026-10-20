@@ -101,6 +101,21 @@ impl Profile {
     }
 }
 
+impl Profile {
+    /// The counts must leave room for every slot the witness builder writes (SPEC.md L3), so
+    /// that no index it computes can fall outside an input vector.
+    fn check_layout(&self) -> Result<(), NymAuthError> {
+        let sig_end = self.sig_npub.saturating_sub(768 + 128) >= 3 + 256
+            && self.sig_ninputs >= self.sig_issuer_trace() + 2 * super::ecdsa::TRACE_LEN;
+        let hash_ok = self.hash_npub >= 10 && self.hash_ninputs >= self.hash_npub + 6;
+        if sig_end && hash_ok {
+            Ok(())
+        } else {
+            Err(bad("input counts leave no room for the witness layout"))
+        }
+    }
+}
+
 fn bad(m: &str) -> NymAuthError {
     NymAuthError::Circuit(format!("internal profile table: {m}"))
 }
@@ -112,6 +127,11 @@ pub(super) fn for_hash_circuit(id: &str) -> Result<Profile, NymAuthError> {
         .ok_or_else(|| {
             NymAuthError::UnsupportedCircuit(format!("no nym_auth profile for hash circuit {id}"))
         })?;
+    build(entry)
+}
+
+/// Parses an entry's slot map and checks that it tiles the circuit's private input slots.
+fn build(entry: &Entry) -> Result<Profile, NymAuthError> {
     let mut lines = entry.map.lines();
     let first: Vec<usize> = lines
         .next()
@@ -135,6 +155,21 @@ pub(super) fn for_hash_circuit(id: &str) -> Result<Profile, NymAuthError> {
         runs.push((a, b, c));
     }
     let semantic_len: usize = runs.iter().map(|r| r.2).sum();
+    // The runs must tile the semantic bits S exactly once too: every `sem_from + len` is read
+    // by the witness builder.
+    let mut used = vec![false; semantic_len];
+    for &(_, from, len) in &runs {
+        for k in 0..len {
+            match used.get_mut(from + k) {
+                Some(u) if !*u => *u = true,
+                _ => {
+                    return Err(bad(
+                        "slot map reads the semantic bits out of range or twice",
+                    ));
+                }
+            }
+        }
+    }
     // The runs must tile the hash circuit's private input slots, each exactly once.
     let mut seen = vec![false; entry.hash_ninputs];
     for &(slot, _, len) in &runs {
@@ -155,7 +190,7 @@ pub(super) fn for_hash_circuit(id: &str) -> Result<Profile, NymAuthError> {
             "slot map does not cover the private semantic slots exactly",
         ));
     }
-    Ok(Profile {
+    let profile = Profile {
         b_sig,
         b_item,
         b_ssc,
@@ -170,7 +205,9 @@ pub(super) fn for_hash_circuit(id: &str) -> Result<Profile, NymAuthError> {
         artifact_sha256: entry.artifact_sha256,
         block_enc_hash: entry.block_enc_hash,
         block_enc_sig: entry.block_enc_sig,
-    })
+    };
+    profile.check_layout()?;
+    Ok(profile)
 }
 
 #[cfg(test)]
@@ -209,6 +246,61 @@ mod tests {
             for_hash_circuit(&"0".repeat(64)),
             Err(NymAuthError::UnsupportedCircuit(_))
         ));
+    }
+
+    fn entry(map: &'static str) -> Entry {
+        Entry {
+            hash_ninputs: 26,
+            hash_npub: 10,
+            map,
+            ..ENTRIES[0]
+        }
+    }
+
+    #[wasm_bindgen_test(unsupported = test)]
+    fn malformed_slot_maps_are_refused() {
+        // Well-formed: profile line, then runs covering slots 10..20 (npub .. ninputs - 6) once.
+        let ok = "profile 7 2 2\nslot_from\tsem_from\tlen\n10\t0\t10\n";
+        let p = build(&entry(ok)).unwrap();
+        assert_eq!((p.runs.len(), p.semantic_len), (1, 10));
+        for (name, map) in [
+            ("empty", ""),
+            (
+                "profile line with a non-number",
+                "profile 7 x 2\n10\t0\t10\n",
+            ),
+            ("profile line arity", "profile 7 2\n10\t0\t10\n"),
+            ("run with a non-number", "profile 7 2 2\n10\tq\t10\n"),
+            ("run arity", "profile 7 2 2\n10\t0\n"),
+            ("overlap", "profile 7 2 2\n10\t0\t10\n14\t0\t2\n"),
+            ("beyond the circuit", "profile 7 2 2\n10\t0\t17\n"),
+            ("gap", "profile 7 2 2\n10\t0\t9\n"),
+            ("covers a public slot", "profile 7 2 2\n9\t0\t11\n"),
+            ("covers the a_p slots", "profile 7 2 2\n10\t0\t12\n"),
+            ("reads S out of range", "profile 7 2 2\n10\t5\t10\n"),
+            ("reads S twice", "profile 7 2 2\n10\t0\t5\n15\t0\t5\n"),
+        ] {
+            assert!(
+                matches!(build(&entry(map)), Err(NymAuthError::Circuit(_))),
+                "{name}"
+            );
+        }
+    }
+
+    #[wasm_bindgen_test(unsupported = test)]
+    fn counts_must_leave_room_for_the_layout() {
+        let p = for_hash_circuit(ENTRIES[0].hash_circuit_id).unwrap();
+        p.check_layout().unwrap();
+        for tweak in [
+            |p: &mut Profile| p.hash_npub = 9,
+            |p: &mut Profile| p.hash_ninputs = p.hash_npub + 5,
+            |p: &mut Profile| p.sig_npub = 1_154,
+            |p: &mut Profile| p.sig_ninputs -= 1,
+        ] {
+            let mut q = for_hash_circuit(ENTRIES[0].hash_circuit_id).unwrap();
+            tweak(&mut q);
+            assert!(q.check_layout().is_err());
+        }
     }
 
     #[wasm_bindgen_test(unsupported = test)]

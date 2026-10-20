@@ -390,7 +390,7 @@ fn refusals_do_not_leak_circuit_state() {
 fn parsed_credential_is_wiped_on_drop() {
     use std::mem::ManuallyDrop;
     let mut p = ManuallyDrop::new(mdoc::Parsed {
-        signed: vec![5; 8],
+        signed: super::super::wipe::Wiped::new(vec![5; 8], 0),
         issuer_sig: [6; 64],
         x: [7; 32],
         y: [8; 32],
@@ -408,4 +408,36 @@ fn the_fuzz_seed_proof_is_a_valid_proof() {
     let seed: &[u8] = include_bytes!("../../../fuzz/seeds/nymauth/proof-seed");
     assert_eq!(seed[0], 1);
     assert_eq!(&seed[1..], REFERENCE_PROOF);
+}
+
+#[wasm_bindgen_test(unsupported = test)]
+fn every_credential_buffer_is_wiped_when_the_witness_builder_returns() {
+    // review finding: the padded copies and the item and signed-message copies were freed
+    // without wiping. The wipe counter (test-only) sums the bytes zeroed on this thread.
+    let fx = Fx::load(0);
+    let profile = profile::for_hash_circuit(MDOC_HASH_CIRCUIT_ID).unwrap();
+    let before = wipe::WIPED_BYTES.with(|c| c.get());
+    let (s, parsed) = mdoc::semantic(&fx.credential, &fx.seed, &fx.vi, &profile).unwrap();
+    assert_eq!(s.len(), profile.semantic_len);
+    drop((s, parsed));
+    let wiped = wipe::WIPED_BYTES.with(|c| c.get()) - before;
+    let expected = [
+        ("signed message (Sig_structure, 7 blocks used: 423 B)", 423),
+        ("birth_date item", 95),
+        ("ssc item", 108),
+        ("padded signed message, 7 blocks", 7 * 64),
+        ("padded birth_date item, 2 blocks", 2 * 64),
+        ("padded ssc item, 2 blocks", 2 * 64),
+        ("padded seed, 1 block", 64),
+        ("padded nym message, 2 blocks", 2 * 64),
+        ("nym message", 119),
+        ("semantic bits S", 96_440),
+        ("issuer signature", 64),
+        ("device key x and y", 64),
+    ];
+    let total: usize = expected.iter().map(|e| e.1).sum();
+    assert_eq!(
+        wiped, total,
+        "bytes wiped vs. the buffers listed: {expected:?}"
+    );
 }

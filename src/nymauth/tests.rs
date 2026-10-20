@@ -1095,3 +1095,6 @@ fn dump_go_smoke_fixture() {
     .unwrap();
     println!("wrote {}", dir.display());
 }
+
+#[cfg(test)]
+mod coverage;

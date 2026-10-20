@@ -189,6 +189,22 @@ func main() {
 	rc = C.nymauth_verify(verifier, &shortReq, nb(pseudonym), nb(proof), &errOut)
 	expect("short transcript seed", -1, rc, errOut)
 
+	// The verifier itself checks that the issuer key is a point of P-256 (the circuits do not):
+	// an off-curve key is refused as invalid input before any proof work, the genuine key above
+	// was accepted.
+	offY := append([]byte(nil), qy...)
+	offY[31] ^= 1
+	offReq := req
+	offReq.issuer_key_y = nb(offY)
+	rc = C.nymauth_verify(verifier, &offReq, nb(pseudonym), nb(proof), &errOut)
+	expect("issuer key off the curve", -1, rc, errOut)
+	zeroKey := make([]byte, 32)
+	zeroReq := req
+	zeroReq.issuer_key_x = nb(zeroKey)
+	zeroReq.issuer_key_y = nb(zeroKey)
+	rc = C.nymauth_verify(verifier, &zeroReq, nb(pseudonym), nb(proof), &errOut)
+	expect("issuer key (0, 0)", -1, rc, errOut)
+
 	// 5. An unlisted circuit build fails closed at load.
 	other := []byte("00" + fx.HashCircuitID[2:])
 	badParams := params

@@ -243,9 +243,13 @@ fn check<'a>(r: &NymAuthRequest<'a>) -> Result<Checked<'a>, NymAuthError> {
             "transcript_seed must be {MIN_TRANSCRIPT_SEED_LEN} to {MAX_TRANSCRIPT_SEED_LEN} bytes"
         )));
     }
+    let qx: [u8; 32] = array(r.issuer_key_x, "issuer_key_x")?;
+    let qy: [u8; 32] = array(r.issuer_key_y, "issuer_key_y")?;
+    // The circuits do not check that Q is on the curve; both sides do, before anything else.
+    ecdsa::validate_public_key(&qx, &qy)?;
     Ok(Checked {
-        qx: array(r.issuer_key_x, "issuer_key_x")?,
-        qy: array(r.issuer_key_y, "issuer_key_y")?,
+        qx,
+        qy,
         t: r.time.as_bytes(),
         e: r.earliest.as_bytes(),
         c: r.cutoff.as_bytes(),

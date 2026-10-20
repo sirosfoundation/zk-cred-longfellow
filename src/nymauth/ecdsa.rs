@@ -136,6 +136,28 @@ fn on_curve(c: &Curve, b: &F, x: &F, y: &F) -> bool {
     y.square() == x.square() * *x + c.a * *x + *b
 }
 
+/// Checks that (`x`, `y`), big-endian, is a point of P-256: both coordinates below p and
+/// y^2 = x^3 - 3x + b. The circuits do not check this for the issuer key, so both the prover and
+/// the verifier do it on the host before processing anything else.
+pub(super) fn validate_public_key(x: &[u8; 32], y: &[u8; 32]) -> Result<(), NymAuthError> {
+    let invalid = |m: &str| NymAuthError::InvalidInput(m.to_string());
+    let (xf, yf) = (
+        fe_be(x).map_err(|_| invalid("issuer key coordinate is not below p"))?,
+        fe_be(y).map_err(|_| invalid("issuer key coordinate is not below p"))?,
+    );
+    let b = fe_be(&const_be(B_HEX))?;
+    let c = Curve {
+        a: -F::from(3u64),
+        b3: F::ZERO,
+        n: BigUint::from(0u8),
+    };
+    if on_curve(&c, &b, &xf, &yf) {
+        Ok(())
+    } else {
+        Err(invalid("issuer key is not a point on P-256"))
+    }
+}
+
 /// The 1,037 values for the verification of signature (r, s) on digest `d` under key
 /// (`qx`, `qy`), all big-endian. Fails with [`NymAuthError::Unsatisfied`] if the signature does
 /// not verify.

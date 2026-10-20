@@ -34,6 +34,9 @@ SWIFT_DIR      := $(BINDINGS_DIR)/swift
 KOTLIN_DIR     := $(BINDINGS_DIR)/kotlin
 XCFRAMEWORK    := $(BUILD_DIR)/$(CRATE_NAME).xcframework
 GO_CABI_DIR    := $(BUILD_DIR)/go-cabi
+# Everything the staged C-ABI libraries are built from: a stale library (built before a source
+# or Cargo change) is rebuilt, not just re-headed.
+RUST_SOURCES   := $(shell find src -name '*.rs') Cargo.toml Cargo.lock
 
 # iOS targets
 IOS_TARGETS      := aarch64-apple-ios
@@ -45,7 +48,7 @@ export IPHONEOS_DEPLOYMENT_TARGET ?= 16.0
 # Android targets (via cargo-ndk)
 ANDROID_TARGETS := aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
 
-.PHONY: go-cabi-nymauth-fixture go-cabi-nymauth-smoke all bindings bindings-swift bindings-kotlin ios android xcframework aar pom publish-local clean check-bindings go-cabi
+.PHONY: go-cabi-nymauth-fixture go-cabi-nymauth-smoke go-cabi-nymauth-check-symbols all bindings bindings-swift bindings-kotlin ios android xcframework aar pom publish-local clean check-bindings go-cabi
 
 all: bindings
 
@@ -87,12 +90,12 @@ $(BUILD_DIR)/release/$(LIB_NAME).$(HOST_LIB_EXT):
 go-cabi: $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) $(GO_CABI_DIR)/$(LIB_NAME).a $(GO_CABI_DIR)/zk_cred_longfellow_go.h $(GO_CABI_DIR)/zk_cred_longfellow_nymauth.h
 	@echo "Go C-ABI library + header staged in $(GO_CABI_DIR)"
 
-$(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT): $(GO_CABI_DIR)/zk_cred_longfellow_go.h
+$(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT): $(GO_CABI_DIR)/zk_cred_longfellow_go.h $(GO_CABI_DIR)/zk_cred_longfellow_nymauth.h $(RUST_SOURCES)
 	cargo build --release
 	@mkdir -p $(GO_CABI_DIR)
 	cp $(BUILD_DIR)/release/$(LIB_NAME).$(HOST_LIB_EXT) $(GO_CABI_DIR)/
 
-$(GO_CABI_DIR)/$(LIB_NAME).a: $(GO_CABI_DIR)/zk_cred_longfellow_go.h
+$(GO_CABI_DIR)/$(LIB_NAME).a: $(GO_CABI_DIR)/zk_cred_longfellow_go.h $(GO_CABI_DIR)/zk_cred_longfellow_nymauth.h $(RUST_SOURCES)
 	cargo build --release
 	@mkdir -p $(GO_CABI_DIR)
 	cp $(BUILD_DIR)/release/$(LIB_NAME).a $(GO_CABI_DIR)/
@@ -110,7 +113,14 @@ $(GO_CABI_DIR)/zk_cred_longfellow_nymauth.h: include/zk_cred_longfellow_nymauth.
 go-cabi-nymauth-fixture:
 	cargo test --release --lib nymauth::tests::dump_go_smoke_fixture -- --ignored
 
-go-cabi-nymauth-smoke: go-cabi go-cabi-nymauth-fixture
+# Fails clearly if the staged library lacks the nymauth entry points (a stale build).
+go-cabi-nymauth-check-symbols: go-cabi
+	@nm -D --defined-only $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) | grep -q ' T nymauth_verifier_new$$' \
+		|| { echo "ERROR: $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) has no nymauth_* symbols (stale library?); run 'make clean go-cabi'"; exit 1; }
+	@nm -D --defined-only $(GO_CABI_DIR)/$(LIB_NAME).$(HOST_LIB_EXT) | grep -q ' T nymauth_prove$$' \
+		|| { echo "ERROR: nymauth_prove missing from the staged library"; exit 1; }
+
+go-cabi-nymauth-smoke: go-cabi go-cabi-nymauth-check-symbols go-cabi-nymauth-fixture
 	cd go-cabi-smoketest && GOWORK=off LD_LIBRARY_PATH=../$(GO_CABI_DIR) go run ./nymauth
 
 # ── iOS cross-compilation (must run on macOS with Xcode toolchains) ─

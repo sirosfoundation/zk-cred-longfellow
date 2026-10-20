@@ -130,7 +130,7 @@ vectors and its proof).
   Ligero masks are full-field elements, so rows that hold only subfield values do not get the compact
   subfield encoding (the cause was not isolated further). Both verifiers accept either.
 * Secret handling. `secret_seed` is copied once; the copy, the padded copies of it made while
-  hashing, the semantic bits, the input vectors, the device signature and its r and s, the device key,
+  hashing, the signed-message, birth_date and ssc item copies and their padded blocks, the semantic bits, the input vectors, the device signature and its r and s, the device key,
   the signed message and its digest, the issuer signature and the MAC key shares a_p are zeroed on
   every exit path. What is not wiped, because it is outside this module's control: the witness,
   tableau and evaluation copies inside the proving system (private fields upstream), the transient
@@ -140,8 +140,9 @@ vectors and its proof).
 * The off-circuit ECDSA arithmetic uses `num-bigint` and is not constant-time. It handles the issuer
   and device signatures, not the seed.
 * Circuit-level gap, for the circuit authors: the circuits do not check that the issuer key Q or the
-  device key lies on the curve. This module checks both on the host (a point off the curve is
-  refused before proving), and a verifier must not rely on the circuit for it.
+  device key lies on the curve. This module checks the issuer key on the host at both prove and verify (a point off the curve or
+  with a coordinate >= p is `InvalidInput`), and the device key at prove time; a verifier must
+  not rely on the circuit for either.
 * Measured on one core of a Ryzen AI 5 340 (release): load 0.15 s, prove 0.8 s, verify 0.45 s, peak
   290 MB resident with a prover and a verifier loaded.
 

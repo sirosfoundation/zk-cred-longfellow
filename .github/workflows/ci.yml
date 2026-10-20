@@ -76,6 +76,31 @@ jobs:
       env:
         WASM_BINDGEN_USE_BROWSER: "1"
 
+  # Line coverage of the nym_auth module only. It uploads the lcov file and prints a per-file table;
+  # the threshold applies to src/nymauth, not to the ISRG code, and no other job depends on it.
+  nymauth-coverage:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+    - name: Install cargo-binstall
+      uses: cargo-bins/cargo-binstall@v1.15.7
+    - uses: actions/checkout@v5
+    - name: Install coverage tools
+      run: |
+        rustup component add llvm-tools-preview
+        cargo binstall --no-confirm cargo-llvm-cov --version 0.8.7
+    - name: Run the nymauth tests with coverage
+      run: "cargo llvm-cov --release --features uniffi --lib --lcov --output-path lcov.info -- nymauth::"
+    - name: Summary and threshold
+      run: python3 .github/scripts/nymauth_coverage.py lcov.info 90
+    - name: Upload lcov
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: nymauth-lcov
+        path: lcov.info
+
   rustsec-advisories:
     runs-on: ubuntu-latest
     continue-on-error: true
