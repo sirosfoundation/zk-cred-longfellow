@@ -125,6 +125,9 @@ distributes them here under this repository's licence (MPL-2.0), unless noted:
   (`credential/` of the archive).
 - `challenge-vectors.json`: the shared SessionTranscript and `e2` vectors (SPEC.md section 3). It is
   byte-identical in zk-cred-vega and zk-cred-longfellow; change it in both or neither.
+  `derive_redirect` and `rejects_redirect` carry the OpenID4VPHandover (redirect or QR delivery,
+  `response_uri`, OpenID4VP 1.0 B.2.6.1) vectors; they run through the channel-agnostic
+  `challenge_digest` until a redirect `derive` entry point exists.
 
 The unit tests check the witness builder against the witness files slot for slot, verify the archive's
 proof, and make new proofs; see `docs/NYMAUTH.md`.

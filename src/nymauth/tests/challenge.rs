@@ -163,6 +163,83 @@ fn a_derived_challenge_proves_and_verifies() {
     );
 }
 
+// The redirect (OpenID4VPHandover) vectors, `derive_redirect` and `rejects_redirect`. There is no
+// redirect `derive` entry point yet, so these run through the channel-agnostic digest
+// (`challenge_digest`), as in zk-cred-vega.
+
+/// `[null, null, ["OpenID4VPHandover", bstr(SHA-256(handover_info))]]`, assembled from the
+/// vector's own `handover_info_hex` (OpenID4VP 1.0 appendix B.2.6.1).
+fn redirect_transcript_from_info(info: &[u8]) -> Vec<u8> {
+    let mut st = vec![0x83, 0xf6, 0xf6, 0x82, 0x71];
+    st.extend_from_slice(b"OpenID4VPHandover");
+    st.extend_from_slice(&[0x58, 0x20]);
+    st.extend_from_slice(&sha256(info));
+    st
+}
+
+#[wasm_bindgen_test(unsupported = test)]
+fn redirect_vectors_give_their_e2_through_the_channel_agnostic_digest() {
+    let v = vectors();
+    let all = v["derive_redirect"].as_array().unwrap();
+    assert!(all.len() >= 6);
+    for case in all {
+        let name = s(case, "name");
+        let st = hex::decode(s(case, "session_transcript_hex")).unwrap();
+        // the transcript is the handover over exactly the listed OpenID4VPHandoverInfo
+        let info = hex::decode(s(case, "handover_info_hex")).unwrap();
+        assert_eq!(st, redirect_transcript_from_info(&info), "{name}");
+        // over redirects the response is encrypted: a 32-byte thumbprint is the third member
+        assert!(thumb(case).is_some_and(|t| t.len() == 32), "{name}");
+        assert_eq!(
+            info[0], 0x84,
+            "{name}: OpenID4VPHandoverInfo is a 4-item array"
+        );
+        // e2 is the shared digest of the transcript, whichever handover it carries
+        let d = challenge_digest(&st, &s(case, "doc_type")).unwrap();
+        assert_eq!(hex::encode(d), s(case, "challenge_digest_hex"), "{name}");
+    }
+}
+
+#[wasm_bindgen_test(unsupported = test)]
+fn every_redirect_reject_vector_breaks_a_rule_and_the_digest_refuses_what_it_can() {
+    let v = vectors();
+    let min = v["min_nonce_chars"].as_u64().unwrap() as usize;
+    let rejects = v["rejects_redirect"].as_array().unwrap();
+    assert!(rejects.len() >= 8);
+    for case in rejects {
+        let name = s(case, "name");
+        assert_eq!(s(case, "op"), "derive_redirect", "{name}");
+        let t = thumb(case);
+        let broken = s(case, "client_id").is_empty()
+            || s(case, "nonce").chars().count() < min
+            || s(case, "response_uri").is_empty()
+            || s(case, "doc_type").is_empty()
+            || t.as_ref().is_none_or(|t| t.len() != 32);
+        assert!(
+            broken,
+            "{name} breaks none of the redirect rules: it is not a reject vector"
+        );
+        // the one rule the existing code enforces: an empty docType is refused by the digest
+        if s(case, "doc_type").is_empty() {
+            let st = redirect_transcript_from_info(b"x");
+            assert!(
+                matches!(
+                    challenge_digest(&st, ""),
+                    Err(NymAuthError::InvalidInput(_))
+                ),
+                "{name}"
+            );
+        }
+    }
+    // the null thumbprint is a reject over redirects, and carries its reason
+    assert!(rejects.iter().any(|c| {
+        c["jwk_thumbprint_hex"].is_null()
+            && c["reason"]
+                .as_str()
+                .is_some_and(|r| r.contains("encrypted"))
+    }));
+}
+
 mod c_abi {
     use super::*;
     use crate::nymauth::c_abi::*;
