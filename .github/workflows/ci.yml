@@ -10,19 +10,18 @@ jobs:
   rust-build:
     runs-on: ubuntu-latest
     steps:
-    - name: Install Rust toolchain
-      # Version, components and targets all come from rust-toolchain.toml,
-      # which rustup honours for every cargo invocation here.
-      uses: dtolnay/rust-toolchain@stable
     - uses: actions/checkout@v5
+    - name: Install the pinned Rust toolchain
+      # Version, components and targets all come from rust-toolchain.toml.
+      uses: ./.github/actions/rust-toolchain
     - name: Build
-      run: cargo build
+      run: cargo build --locked
     - name: Format
       run: cargo fmt --message-format human -- --check
     - name: Clippy
-      run: cargo clippy --workspace --all-targets -- -Dwarnings
+      run: cargo clippy --locked --workspace --all-targets -- -Dwarnings
     - name: Document
-      run: cargo doc
+      run: cargo doc --locked
       env:
         RUSTDOCFLAGS: "-D warnings"
     - name: Test
@@ -31,14 +30,14 @@ jobs:
       # via a CLI flag here - the bench targets below are harness=false
       # (criterion) and don't understand libtest's `--skip`, so any skip
       # flag added at this level would break them instead.
-      run: cargo test
+      run: cargo test --locked
     - name: Test benchmarks
-      run: cargo test --benches
+      run: cargo test --locked --benches
     - name: "Check for #[test] macro"
       run: |
         bash -c "! grep -r '#\[test\]' src"
     - name: Check uniffi build
-      run: cargo check --features uniffi
+      run: cargo check --locked --features uniffi
     - name: cargo-deny
       uses: EmbarkStudios/cargo-deny-action@v2.0.15
       with:
@@ -47,8 +46,6 @@ jobs:
   wasm-node:
     runs-on: ubuntu-latest
     steps:
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
     - name: Install Node.js
       uses: actions/setup-node@v5
       with:
@@ -58,19 +55,23 @@ jobs:
     - name: Install wasm-pack
       run: cargo binstall wasm-pack --version 0.13.1
     - uses: actions/checkout@v5
+    - name: Install the pinned Rust toolchain
+      # Version, components and targets all come from rust-toolchain.toml.
+      uses: ./.github/actions/rust-toolchain
     - name: Test (Node.js)
       run: wasm-pack test --node
 
   wasm-firefox:
     runs-on: ubuntu-latest
     steps:
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
     - name: Install cargo-binstall
       uses: cargo-bins/cargo-binstall@v1.15.7
     - name: Install wasm-pack
       run: cargo binstall wasm-pack --version 0.13.1
     - uses: actions/checkout@v5
+    - name: Install the pinned Rust toolchain
+      # Version, components and targets all come from rust-toolchain.toml.
+      uses: ./.github/actions/rust-toolchain
     - name: Test (Firefox)
       run: wasm-pack test --firefox --headless
       env:
@@ -81,17 +82,17 @@ jobs:
   nymauth-coverage:
     runs-on: ubuntu-latest
     steps:
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
     - name: Install cargo-binstall
       uses: cargo-bins/cargo-binstall@v1.15.7
     - uses: actions/checkout@v5
+    - name: Install the pinned Rust toolchain
+      # Version, components and targets all come from rust-toolchain.toml.
+      uses: ./.github/actions/rust-toolchain
     - name: Install coverage tools
       run: |
-        rustup component add llvm-tools-preview
         cargo binstall --no-confirm cargo-llvm-cov --version 0.8.7
     - name: Run the nymauth tests with coverage
-      run: "cargo llvm-cov --release --features uniffi --lib --lcov --output-path lcov.info -- nymauth::"
+      run: "cargo llvm-cov --locked --release --features uniffi --lib --lcov --output-path lcov.info -- nymauth::"
     - name: Summary and threshold
       run: python3 .github/scripts/nymauth_coverage.py lcov.info 90
     - name: Upload lcov

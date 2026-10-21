@@ -1,19 +1,20 @@
-# Pin the toolchain so CI can't break without a change in this repo.
+# Exact toolchain pin: the single source of truth. rustup honours this file for
+# every local cargo/rustc, and CI installs from it through
+# .github/actions/rust-toolchain, so local and CI builds use the same compiler.
 #
-# CI previously used `dtolnay/rust-toolchain@stable`, so every Rust release
-# was silently a CI change: 1.98.0 made clippy::chunks_exact_to_as_chunks
-# warn-by-default and turned `main` red with no commit behind it. rustup
-# honours this file for every cargo invocation in the repo, so local builds
-# and CI agree by construction.
+# Why exact: a floating channel makes every Rust release silently a CI change.
+# 1.98.0 made clippy::chunks_exact_to_as_chunks warn-by-default and turned
+# `main` red with no commit behind it.
 #
-# Bump deliberately, in its own commit, so a lint or codegen change is
-# attributable to that bump rather than to whatever merged that day.
+# To bump: change `channel` (Dependabot's `rust-toolchain` ecosystem opens this
+# PR monthly), in its own commit, so a lint or codegen change is attributable to
+# the bump rather than to whatever merged that day. Run fmt, clippy and tests.
 [toolchain]
-channel = "1.98.0"
+channel = "1.99.1"
+profile = "minimal"
 components = ["clippy", "rustfmt"]
-# Declared here rather than per-job in the workflows: the workflow's
-# `targets:` input installs them for whichever toolchain the action picked,
-# which is not necessarily this one.
+# Declared here rather than per-job in the workflows, so every job and every
+# local checkout installs the same set.
 targets = [
   "wasm32-unknown-unknown",
   "aarch64-linux-android",

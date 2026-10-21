@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/rust-toolchain
       - uses: Swatinem/rust-cache@v2
       - run: make bindings
       - uses: actions/upload-artifact@v6
@@ -43,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       # Toolchain version and targets both come from rust-toolchain.toml.
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/rust-toolchain
       - uses: Swatinem/rust-cache@v2
       - uses: actions/download-artifact@v8
         with:
@@ -70,7 +70,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       # Toolchain version and targets both come from rust-toolchain.toml.
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/rust-toolchain
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-ndk
         run: cargo install cargo-ndk
