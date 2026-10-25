@@ -14,10 +14,11 @@ use crate::{
 use anyhow::anyhow;
 use rand::RngCore;
 use std::io::Cursor;
+#[cfg(feature = "js")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
 /// Zero-knowledge prover for mdoc credential presentations.
-#[wasm_bindgen]
+#[cfg_attr(feature = "js", wasm_bindgen)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct MdocZkProver {
     circuit_version: CircuitVersion,
@@ -398,6 +399,7 @@ mod tests {
 /// @param {string} time - The current time in RFC 3339 format (e.g. "2026-03-05T22:39:45Z").
 /// @param {Uint8Array} verifier_context - 32-byte verifier context for PPID derivation.
 /// @returns {Uint8Array} The serialized proof.
+#[cfg(feature = "js")]
 #[wasm_bindgen]
 pub fn prove_with_ppid_wasm(
     prover: &MdocZkProver,
@@ -430,6 +432,7 @@ pub fn prove_with_ppid_wasm(
 }
 
 /// Initialize a V8 verifier from a circuit binary.
+#[cfg(feature = "js")]
 #[wasm_bindgen]
 pub fn initialize_verifier(
     circuit: &[u8],
@@ -441,6 +444,7 @@ pub fn initialize_verifier(
 }
 
 /// Verify a V8 proof with PPID support.
+#[cfg(feature = "js")]
 #[wasm_bindgen]
 #[allow(clippy::too_many_arguments)]
 pub fn verify_with_ppid_wasm(

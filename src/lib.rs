@@ -13,7 +13,7 @@ pub mod fields;
 /// Plain C-ABI bindings for a Go (cgo) verifier service — a hand-written
 /// `extern "C"` ABI, distinct from the UniFFI/RustBuffer-based `ffi_api`.
 pub mod go_ffi;
-#[cfg(target_family = "wasm")]
+#[cfg(all(feature = "js", target_family = "wasm"))]
 pub mod js_api;
 pub mod ligero;
 pub mod mdoc_zk;

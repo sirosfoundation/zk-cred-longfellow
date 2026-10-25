@@ -12,11 +12,12 @@ use crate::{
 };
 use anyhow::{Context, anyhow};
 use std::borrow::Cow;
+#[cfg(feature = "js")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
 /// Zero-knowledge verifier for mdoc credential presentations.
 #[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
-#[wasm_bindgen]
+#[cfg_attr(feature = "js", wasm_bindgen)]
 pub struct MdocZkVerifier {
     circuit_version: CircuitVersion,
     num_attributes: usize,
