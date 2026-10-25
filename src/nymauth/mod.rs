@@ -34,9 +34,14 @@ mod sha;
 mod tests;
 mod wipe;
 
+// A C ABI has no consumer in a wasm module, and its `no_mangle` symbols would take the export
+// names of the wasm-bindgen entry points (`nymauth_prove`).
+#[cfg(not(target_family = "wasm"))]
 pub mod c_abi;
 #[cfg(feature = "uniffi")]
 pub mod ffi_uniffi;
+#[cfg(target_family = "wasm")]
+pub mod js_api;
 
 pub use challenge::{
     MIN_NONCE_CHARS, NymAuthChallenge, challenge_digest, derive_challenge, verifier_input,
