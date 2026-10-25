@@ -27,6 +27,8 @@ Bindings:
 
 * UniFFI (Kotlin, Swift): `nymauth_initialize_prover`, `nymauth_initialize_verifier`, `nymauth_prove`,
   `nymauth_verify` in `src/nymauth/ffi_uniffi.rs`. Errors are the flat `NymAuthError` enum.
+  Verification refuses a proof that does not decode with `ProofEncoding` (C status -8) and a
+  proof that does not verify with `Verification` (-7).
 * Plain C ABI (cgo and others): `nymauth_*` in `src/nymauth/c_abi.rs`, header
   `include/zk_cred_longfellow_nymauth.h`, staged by `make go-cabi`.
 
@@ -55,8 +57,9 @@ thumbprint that is not 32 bytes. The same algorithm is in zk-cred-vega. Both are
 The prover and verifier validate the request: `transcript_seed` is 32 to 65,536 bytes (a
 SessionTranscript with a 32-byte handover hash is over 50 bytes; the floor only rejects empty and
 trivial seeds); `T` is `YYYY-MM-DDThh:mm:ssZ`; `E` and `C` are `YYYY-MM-DD`; all digits only and
-calendar-valid (leap years included), `E` may be the sentinel `0000-00-00`, and `E <= C`. This is the
-same digit-only, calendar-valid rule as the Vega library.
+calendar-valid in the proleptic Gregorian calendar, years 0000 to 9999 (leap years included), `E`
+may be the sentinel `0000-00-00`, and `E <= C`. This is the same digit-only, calendar-valid rule as
+the Vega library.
 
 ## Circuit artifact and the allowlist
 

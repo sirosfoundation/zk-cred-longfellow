@@ -72,6 +72,7 @@ fn status(e: &NymAuthError) -> i32 {
         NymAuthError::Unsatisfied(_) => -5,
         NymAuthError::Prover(_) => -6,
         NymAuthError::Verification(_) => -7,
+        NymAuthError::ProofEncoding(_) => -8,
     }
 }
 
@@ -537,6 +538,7 @@ mod tests {
             (NymAuthError::Unsatisfied(String::new()), -5),
             (NymAuthError::Prover(String::new()), -6),
             (NymAuthError::Verification(String::new()), -7),
+            (NymAuthError::ProofEncoding(String::new()), -8),
         ];
         for (e, code) in all {
             assert_eq!(status(&e), code, "{e}");

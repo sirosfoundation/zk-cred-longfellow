@@ -19,7 +19,8 @@
  *   -5  statement not satisfied (wrong seed, key, signature or request);
  *       no proof is produced
  *   -6  prover failure
- *   -7  proof refused
+ *   -7  proof refused: a circuit's proof does not verify
+ *   -8  proof encoding: the proof bytes do not decode
  * -100  an internal panic was caught at the boundary
  *
  * Errors also write an owned message to `*error_out` when that is non-NULL;

@@ -303,9 +303,12 @@ fn time_and_dates_must_be_calendar_valid_digits() {
         "E > C",
     );
     // Valid edge cases are accepted by validation (the proofs are then refused on content).
+    // Year 0000 is a leap year of the proleptic Gregorian calendar.
     for (t, e, c) in [
         ("2024-02-29T23:59:59Z", "0000-00-00", "9999-12-31"),
         ("2000-02-29T00:00:00Z", "1900-01-01", "1900-01-01"),
+        ("2026-10-09T12:00:00Z", "0000-01-01", "0000-02-29"),
+        ("0000-02-29T00:00:00Z", "0000-00-00", "0000-01-01"),
     ] {
         let rq = NymAuthRequest {
             time: t,

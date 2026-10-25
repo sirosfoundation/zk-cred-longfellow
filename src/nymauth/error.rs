@@ -19,7 +19,9 @@ pub enum NymAuthError {
     Unsatisfied(String),
     /// The proving system failed.
     Prover(String),
-    /// The proof was not accepted.
+    /// The proof bytes do not decode: a short or malformed proof, or bytes after its end.
+    ProofEncoding(String),
+    /// The proof decodes, and a circuit's proof does not verify for the request.
     Verification(String),
 }
 
@@ -32,6 +34,7 @@ impl fmt::Display for NymAuthError {
             Self::Credential(m) => ("credential", m),
             Self::Unsatisfied(m) => ("statement not satisfied", m),
             Self::Prover(m) => ("prover", m),
+            Self::ProofEncoding(m) => ("proof encoding", m),
             Self::Verification(m) => ("verification failed", m),
         };
         write!(f, "nymauth {kind}: {msg}")

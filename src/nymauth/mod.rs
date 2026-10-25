@@ -190,8 +190,8 @@ fn days_in_month(y: u32, m: u32) -> u32 {
     }
 }
 
-/// `YYYY-MM-DD`, digits only and calendar-valid (year 0001 to 9999). With `allow_zero`, the
-/// sentinel `0000-00-00` (no lower bound) is accepted too.
+/// `YYYY-MM-DD`, digits only and calendar-valid in the proleptic Gregorian calendar (year 0000 to
+/// 9999). With `allow_zero`, the sentinel `0000-00-00` (no lower bound) is accepted too.
 fn valid_date(d: &[u8], allow_zero: bool) -> bool {
     if d.len() != DATE_LEN || d[4] != b'-' || d[7] != b'-' {
         return false;
@@ -201,7 +201,7 @@ fn valid_date(d: &[u8], allow_zero: bool) -> bool {
     }
     match (digits(&d[..4]), digits(&d[5..7]), digits(&d[8..])) {
         (Some(y), Some(m), Some(day)) => {
-            y >= 1 && (1..=12).contains(&m) && (1..=days_in_month(y, m)).contains(&day)
+            (1..=12).contains(&m) && (1..=days_in_month(y, m)).contains(&day)
         }
         _ => false,
     }
@@ -863,7 +863,7 @@ impl NymAuthVerifier {
             sig_layout: self.sig_verifier.tableau_layout(),
         };
         let proof = Proof::get_decoded_with_param(&ctx, proof)
-            .map_err(|e| NymAuthError::Verification(format!("could not parse proof: {e:#}")))?;
+            .map_err(|e| NymAuthError::ProofEncoding(format!("could not parse proof: {e:#}")))?;
 
         let mut transcript = Transcript::new(c.seed, TranscriptMode::Normal).map_err(ver)?;
         transcript

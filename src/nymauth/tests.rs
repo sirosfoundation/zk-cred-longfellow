@@ -338,32 +338,40 @@ fn verification_refuses_tampered_proofs_and_requests() {
     let ok =
         |req: &NymAuthRequest<'_>, nym: &[u8], proof: &[u8]| verifier().verify(req, nym, proof);
 
-    // One flipped bit anywhere in the proof, including the tags at the front.
+    // One flipped bit anywhere in the proof, including the tags at the front. A tag takes any
+    // 16 bytes, so a flipped tag decodes and fails verification.
     for at in [0usize, 100, pf.proof.len() / 2, pf.proof.len() - 1] {
         let mut bad = pf.proof.clone();
         bad[at] ^= 1;
+        let refused = ok(&fx.request(), &pf.pseudonym, &bad);
         assert!(
-            ok(&fx.request(), &pf.pseudonym, &bad).is_err(),
-            "flip at {at}"
+            matches!(
+                refused,
+                Err(NymAuthError::Verification(_) | NymAuthError::ProofEncoding(_))
+            ),
+            "flip at {at}: {refused:?}"
         );
+        if at == 0 {
+            assert!(matches!(refused, Err(NymAuthError::Verification(_))));
+        }
     }
+    // The Go smoke test's tamper case: 0xff at the middle byte.
+    let mut middle = pf.proof.clone();
+    middle[pf.proof.len() / 2] ^= 0xff;
+    assert!(matches!(
+        ok(&fx.request(), &pf.pseudonym, &middle),
+        Err(NymAuthError::Verification(_))
+    ));
     // Truncated or extended.
-    assert!(
-        ok(
-            &fx.request(),
-            &pf.pseudonym,
-            &pf.proof[..pf.proof.len() - 1]
-        )
-        .is_err()
-    );
-    assert!(
-        ok(
-            &fx.request(),
-            &pf.pseudonym,
-            &[&pf.proof[..], &[0u8][..]].concat()
-        )
-        .is_err()
-    );
+    for bad in [
+        pf.proof[..pf.proof.len() - 1].to_vec(),
+        [&pf.proof[..], &[0u8][..]].concat(),
+    ] {
+        assert!(matches!(
+            ok(&fx.request(), &pf.pseudonym, &bad),
+            Err(NymAuthError::ProofEncoding(_))
+        ));
+    }
 
     // A different pseudonym.
     let mut nym = pf.pseudonym;

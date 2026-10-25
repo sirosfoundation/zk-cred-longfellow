@@ -666,6 +666,10 @@ fn every_error_variant_has_its_own_prefix() {
         ),
         (NymAuthError::Prover("a".into()), "nymauth prover: a"),
         (
+            NymAuthError::ProofEncoding("a".into()),
+            "nymauth proof encoding: a",
+        ),
+        (
             NymAuthError::Verification("a".into()),
             "nymauth verification failed: a",
         ),
