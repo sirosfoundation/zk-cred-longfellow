@@ -1,6 +1,6 @@
 # Pass binding: exposing a wallet credential as a short-lived pass
 
-Status: draft design, for discussion. Nothing here is implemented. Related reading: the SEDI
+Status: draft design, revised after review. Nothing here is implemented. Related reading: the SEDI
 "Credential Equivalence Proofs (CEPs)" proposal (Reed, Miller, Leon, V2, 2026-10-09) and
 [`NYMAUTH.md`](NYMAUTH.md).
 
@@ -11,6 +11,13 @@ venue entry, transit, member access) the holder wants a **pass** in a platform w
 Google Wallet) or another wallet. The pass is a simplified, short-lived object that a participating
 **pass verifier** (gate, reader, back end) can check quickly, often offline and often by tapping or
 scanning, without the holder opening our app.
+
+This is a **notarized, delayed presentation**. The app makes an ordinary ZK presentation to a pass
+issuer (OpenID4VP with a nym_auth zkp request, optionally inside OID4VCI as presentation during
+issuance). The pass issuer acts as a notary: it verifies the presentation once, then signs a pass that
+records what was proved. A user-signed pass would prove nothing, so verifiers rely on the pass
+issuer's signature from a registered key. What is new is only what the pass carries and how a
+verifier can check it later.
 
 We want participating pass verifiers to be able to validate, with zero-knowledge, that **the pass is
 bound to a valid primary credential held by the same person**, without learning the credential, its
@@ -30,13 +37,14 @@ Goals
 
 * G1. A pass is cryptographically bound to a primary credential: it can only be obtained by someone
   who holds a valid credential and its device key, and a verifier can check that.
-* G2. The binding reveals nothing beyond the pass's own claims (for example "over 18", "ticket
-  class", a pass identifier). No issuer signature, no unique credential identifier, no unrelated claims.
+* G2. The binding reveals no issuer signature, no unique credential identifier and no unrelated
+  claims. The issuer's identity (its key Q) is disclosed by design: it is a public input the verifier
+  needs. Hiding it would need a set-membership circuit (future work).
 * G3. Different passes from the same credential are unlinkable by verifiers (and by the pass issuer
   across unrelated contexts), unless the holder chooses otherwise.
 * G4. Passes are short-lived; lifecycle is by expiry and refresh, not revocation lists.
 * G5. Works with today's platform wallets as pass carriers, using only what they already accept.
-* G6. A first phase that needs **no new circuit**: it reuses the existing `nymauth` proof.
+* G6. A first phase that reuses the existing `nymauth` proof. Whether it needs a separate context input is open (section 4).
 
 Non-goals
 
@@ -58,30 +66,35 @@ Non-goals
 
 ## 4. The binding statement
 
-The prover shows, in zero knowledge, the following (this is what `nymauth` already proves, see
-`NYMAUTH.md` "What it proves"):
+The app makes one ZK presentation to the pass issuer using the existing nym_auth proof (see
+`NYMAUTH.md` "What it proves"). The proof shows:
 
-* S1. A credential exists that is signed under an accepted primary issuer key Q and has an accepted
-  docType.
-* S2. The claim predicate holds. In phase 0 this is the existing predicate: birth date in `[E, C]`
-  and validity at time `T`.
-* S3. The device key in the credential signed the challenge `e2`, where `e2` is derived from the
-  session transcript. The transcript commits to the pass issuer's origin and nonce, and optionally to
-  the thumbprint of a **pass key** `Kp` (the `jwk_thumbprint` argument of `derive_challenge`).
-* S4. **Pass nym** `N = SHA-256(DST || secret_seed || 0x00*32 || SHA-256(verifier_id))`, where
-  `SHA-256(secret_seed)` is the `ssc` value signed in the credential.
+* S1. A credential exists, signed under an accepted primary issuer key Q, with an accepted docType.
+  Q is a public input and is recorded on the pass.
+* S2. The claim predicate holds. In phase 0: birth date in `[E, C]` and validity at time `T`.
+* S3. The device key in the credential signed the challenge `e2`. The PI derives `e2` from a session
+  transcript committing to its origin, a fresh nonce and the thumbprint of a **pass key** `Kp` (the
+  `jwk_thumbprint` argument of `derive_challenge`). This is the primary binding: the credential holder
+  authorized `Kp` for this pass. No pseudonym is needed for that.
+* S4. The proof also outputs a pseudonym `N = SHA-256(DST || secret_seed || 0x00*32 || SHA-256(verifier
+  input))`, where `SHA-256(secret_seed)` is the `ssc` value signed in the credential. `N` is optional
+  on the pass but always kept in the proof bundle, because the verifier checks it.
 
-The pass binding is S4 with a verifier id that names the pass:
+**Pass context, not `verifier_id`.** A `verifier_id` names a relying party in a trust framework, and `N`
+under it is that relying party's pseudonym for the holder. Putting a pass name there would interfere
+with the trust framework. The pass supplies a separate **verifier_context**:
 
 ```
-verifier_id = "pass:v1:" || pass_issuer_id || ":" || pass_serial
+verifier_context = "pass:v1:" || pass_issuer_id || ":" || pass_serial
 ```
 
-The pass carries `N`. Because `secret_seed` is committed in the signed credential, only a holder of the
-credential can produce an `N` consistent with S1 to S3, and `N` is different for every `pass_serial`
-(G3). Nothing in the pass reveals `secret_seed`, `ssc` or the issuer signature.
+`N` then differs for every `pass_serial` and cannot collide with a real verifier's pseudonym.
 
-Because `verifier_id` is just an input, **phase 0 needs no circuit change** and no new profile entry.
+Open point: the crate today exposes a single verifier input derived from the verifier id
+(`verifier_input(client_id)`), and the circuit spec lives in the nym-auth-circuits archive. Not checked:
+whether that spec has, or could take, a separate context input without a circuit change. If not, the
+fallback is the `pass:v1:` domain-separated value in the existing input, which is collision-free but
+still a hack. The recommendation to the circuit author is to add an explicit `verifier_context`.
 
 ## 5. What goes in the pass
 
@@ -90,8 +103,9 @@ binding block:
 
 | Field | Size | Purpose |
 |---|---|---|
-| `pass_serial` | 16 bytes | Unique per pass, part of `verifier_id` |
-| `nym` (`N`) | 32 bytes | S4 value |
+| `pass_serial` | 16 bytes | Unique per pass, part of `verifier_context` |
+| `issuer` (Q id) | 32 bytes | Thumbprint of the primary issuer key Q, a public input; disclosed by design |
+| `nym` (`N`) | 32 bytes | Optional on the pass. The S4 value, always in the proof bundle |
 | `pred` | few bytes | Which predicate S2 proved (for example `age>=18`) and the `E`, `C`, `T` window |
 | `kp` (optional) | 32 bytes | Thumbprint of the pass key bound by S3 (Tier B) |
 | `proof_ref` | URL or id | Where the full proof bundle can be fetched (Tier A2) |
@@ -106,11 +120,15 @@ reader hardware must be benchmarked before choosing tiers (open question 1).
 
 ### 6.1 Provisioning (app to pass issuer)
 
+This is an OpenID4VP presentation with a nym_auth zkp request, or the same request carried inside
+OID4VCI as presentation during issuance. The pass issuer is the verifier and then notarizes the result
+in a pass.
+
+
 1. App asks the PI for a pass for context `ctx` (event, flight, venue).
-2. PI creates `pass_serial` and a fresh nonce, and returns the request: origin, nonce, predicate
-   window, `verifier_id`. The PI derives `e2` and the transcript seed itself with `derive_challenge`
+2. PI creates `pass_serial` and a fresh nonce, and returns the request: origin, nonce, predicate window, `Kp` thumbprint, `verifier_context`. The PI derives `e2` and the transcript seed itself with `derive_challenge`
    (never copied from the holder, see `NYMAUTH.md`).
-3. App checks that the PI is in the registry and that `verifier_id` has the pass form, and shows the
+3. App checks that the PI is in the registry and that `verifier_context` has the pass form, and shows the
    consent screen (what the pass will reveal).
 4. App runs `NymAuthProver::prove`, which returns `{proof, pseudonym = N}`.
 5. PI runs `NymAuthVerifier::verify(request, N, proof)`. On success it signs and issues the pass with
@@ -132,9 +150,12 @@ Participating verifiers choose a tier. They can all run the same registry data.
   `NymAuthVerifier::verify(request, N, proof)` itself. PV then no longer trusts the PI for the binding,
   only for pass identity and context. It can be done lazily (audit, or on first sight of a pass).
 * **Tier B, live possession.** The app (open, nearby) answers a fresh PV challenge with a signature
-  from `kp` (and, if the PV wants a fresh ZK proof, a new `nymauth` proof under a PV-chosen
-  `verifier_id`). Because `kp` was bound by S3 at provisioning, the PV checks pass, `kp` and the
+  from `kp` (and, if the PV wants a fresh ZK proof, a new `nymauth` proof under a PV-chosen `verifier_context`). Because `kp` was bound by S3 at provisioning, the PV checks pass, `kp` and the
   credential together. This is the only tier that resists copying of the pass.
+
+Tier A1 is notarization: the verifier trusts the pass issuer's signature, and the ZK proof only gives the
+pass issuer its assurance. Tiers A2 and B let the verifier check the proof itself, so a participating
+verifier does not have to trust the pass issuer for the binding.
 
 A deployment can mix tiers per context (for example A1 at a low-risk gate, A2 for age-restricted sales,
 B for high-value access).
@@ -172,11 +193,11 @@ rule that nothing is trusted from the descriptor or the artifact.
 
 * **Cross-pass unlinkability.** `N` depends on `pass_serial`, so two passes from one credential carry
   unrelated nyms, and colluding PVs cannot join them. If a context needs a stable id (loyalty), use
-  a context-stable `verifier_id` instead, as an explicit, consented choice.
+  a context-stable `verifier_context` instead, as an explicit, consented choice.
 * **Primary issuer.** Not involved, learns nothing, cannot collude with verifiers. This preserves the
   CEP benefit.
 * **Pass issuer.** Sees the proof and `N` for its own passes. It can link its own passes only if the
-  holder reuses `verifier_id` parts. It cannot link them to the issuer or other PIs.
+  holder reuses `verifier_context` parts. It cannot link them to the issuer or other PIs.
 * **Disclosure.** Only the predicate and the pass's display fields. The pass fields themselves are
   visible to the platform wallet vendor, which is outside our control. The pass should contain only
   what the context needs.
@@ -195,6 +216,7 @@ rule that nothing is trusted from the descriptor or the artifact.
 | Pass copied to another device | Short expiry, rotating tokens. Tier B for strong prevention | A1/A2 do not stop a deliberate share or screenshot |
 | Replay of the provisioning proof | PI nonce and transcript binding, `e2` per request | None beyond nonce quality |
 | Substituting another holder's `N` into a pass | `N` is bound to `secret_seed` in the signed credential | None |
+| Self-signed or unregistered pass | Verifiers accept only pass issuers in the registry; a user signature proves nothing | Registry integrity |
 | Downgrade to A1 by a malicious PI | PV-required tier per context from the registry | Registry integrity |
 | Wrong or malicious circuit | Allowlist by circuit id and artifact hash | Circuit correctness. Needs ZK review, as the CEP document says |
 
@@ -216,13 +238,13 @@ that reveals chosen attributes, see phase 2.
 
 ## 11. Implementation plan
 
-Phase 0, existing circuit, no crate changes
+Phase 0, existing proof (circuit change only if a separate context input is needed)
 
-* Define the `verifier_id` pass form and binding block encoding (this document).
+* Define the `verifier_context` pass form and binding block encoding (this document).
 * Provisioning and A1/A2 verification using `NymAuthProver`/`NymAuthVerifier` as they are.
 * A reference PI service, a reference verifier (Rust and the C ABI for Go/embedded), and a pass
   generator for one carrier.
-* Add test vectors for `verifier_id` encoding next to `test-vectors/nymauth/`.
+* Add test vectors for `verifier_context` encoding next to `test-vectors/nymauth/`.
 * Benchmark proving on phones and verification on reader-class hardware.
 
 Phase 1, holder binding
@@ -250,3 +272,7 @@ Phase 3, optional
 4. Is stable pseudonymity across a context ever required, and under what consent?
 5. Which claim predicates beyond age and validity are needed first.
 6. Governance of the registry and who reviews circuits (the CEP document's own caveat).
+7. Does the nym_auth spec have, or need, a separate `verifier_context` input so passes never share the
+   trust framework's `verifier_id`? (Reviewer feedback.)
+8. Can provisioning be expressed purely as OpenID4VP or OID4VCI presentation during issuance, with the
+   pass issuer as the verifier? (Reviewer feedback.)
