@@ -26,6 +26,10 @@ required-git-spec = "rev"
 version = 2
 allow = [
     "Apache-2.0",
+    # zstd-sys vendors the upstream zstd C sources, which carry
+    # "BSD-3-Clause AND BSD-2-Clause": both halves have to be allowed or the
+    # whole compression dependency is rejected.
+    "BSD-2-Clause",
     "BSD-3-Clause",
     "MIT",
     "MPL-2.0",
